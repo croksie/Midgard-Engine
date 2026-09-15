@@ -14,7 +14,7 @@
 
 namespace midgard::utils::importer {
 
-inline scene::Model importModel(const std::string& pFile, bifrost::Bifrost* bifrost) {
+inline scene::Model importModel(const std::string& pFile, bifrost::Bifrost* bifrost, bool useInstance = false) {
     // Import file
     Assimp::Importer importer;
 
@@ -76,13 +76,13 @@ inline scene::Model importModel(const std::string& pFile, bifrost::Bifrost* bifr
 
     auto mesh = std::make_shared<resource::Mesh>(vertexBuffer, indexBuffer);
 
-
     // Material
     std::string assetFolder(ASSETS_PATH);
     bifrost::PipelineInfo pipelineInfo;
-    pipelineInfo.vertexShader = bifrost->createShader(bifrost::ShaderType::VERTEX, utils::file::readTextFile(assetFolder + "shaders/instance.vert"));
+    std::string vertPath = useInstance ? (assetFolder + "shaders/instance.vert") : (assetFolder + "shaders/base.vert");
+    pipelineInfo.vertexShader = bifrost->createShader(bifrost::ShaderType::VERTEX, utils::file::readTextFile(vertPath));
     pipelineInfo.fragmentShader = bifrost->createShader(bifrost::ShaderType::FRAGMENT, utils::file::readTextFile(assetFolder + "shaders/base.frag"));
-    pipelineInfo.useInstance = true;
+    pipelineInfo.useInstance = useInstance;
 
     auto pipeline = bifrost->createPipeline(pipelineInfo);
     auto material = std::make_shared<resource::Material>(pipeline);

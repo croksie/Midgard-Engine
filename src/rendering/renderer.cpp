@@ -211,7 +211,7 @@ void Renderer::initialize(platform::Window* window, std::shared_ptr<core::Engine
 
     // Create Test Models
     //createTestModel();
-    m_model = utils::importer::importModel(assetFolder + "model/suzanne.glb", m_rhi.get());
+    m_model = utils::importer::importModel(assetFolder + "model/suzanne.glb", m_rhi.get(), false);
 
     ENGINE_LOG_INFO("Renderer initialized");
 }
@@ -274,8 +274,8 @@ void Renderer::render() {
     //     m_rhi->bindPipeline(material->getPipeline().get());
     //     m_rhi->bindVertexBuffer(material->getPipeline(), mesh->getVertexBuffer());
     //     m_rhi->bindIndexBuffer(material->getPipeline(), mesh->getIndexBuffer());
-    //     m_rhi->bindInstanceBuffer(material->getPipeline(), m_instanceBuffer);
-    //     m_rhi->bindTexture(material->getPipeline(), material->getTexture(), 1);
+    //     m_rhi->setLocalUniform(&modelMat, sizeof(modelMat));
+    //     m_rhi->bindTexture(material->getPipeline(), material->getTexture(), 0);
     //     m_rhi->draw(material->getPipeline(), 900);
     // //}
 
@@ -285,9 +285,9 @@ void Renderer::render() {
     m_rhi->bindPipeline(material->getPipeline().get());
     m_rhi->bindVertexBuffer(material->getPipeline(), mesh->getVertexBuffer());
     m_rhi->bindIndexBuffer(material->getPipeline(), mesh->getIndexBuffer());
-    m_rhi->bindInstanceBuffer(material->getPipeline(), m_instanceBuffer);
-    m_rhi->bindTexture(material->getPipeline(), material->getTexture(), 1);
-    m_rhi->draw(material->getPipeline());
+    m_rhi->setLocalUniform(&modelMat, sizeof(modelMat));
+    m_rhi->bindTexture(material->getPipeline(), material->getTexture(), 0);
+    m_rhi->draw(material->getPipeline(), 1);
 
     m_rhi->endFrame();
     ENGINE_LOG_TRACE("Render end");
