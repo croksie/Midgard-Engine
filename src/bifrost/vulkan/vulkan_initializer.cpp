@@ -225,7 +225,9 @@ void createUniformBuffers(VulkanContext &ctx) {
 }
 
 void createDescriptorSetLayout(VulkanContext &ctx) {
-    ENGINE_LOG_TRACE("Creating descriptor set layout...");
+    ENGINE_LOG_TRACE("Creating descriptor set layouts...");
+
+    // Set 0 : Global Uniform
     VkDescriptorSetLayoutBinding globalLayoutBinding{};
     globalLayoutBinding.binding = 0;
     globalLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -233,22 +235,30 @@ void createDescriptorSetLayout(VulkanContext &ctx) {
     globalLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     globalLayoutBinding.pImmutableSamplers = nullptr;
 
+    VkDescriptorSetLayoutCreateInfo globalLayoutInfo{};
+    globalLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    globalLayoutInfo.bindingCount = 1;
+    globalLayoutInfo.pBindings = &globalLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(ctx.device, &globalLayoutInfo, nullptr, &ctx.globalDescriptorSetLayout) != VK_SUCCESS) {
+        ENGINE_LOG_CRITICAL("Failed to create global descriptor set layout");
+    }
+
+    // Set 1 : Material / Texture
     VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.binding = 0;
     samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerLayoutBinding.descriptorCount = 1;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { globalLayoutBinding, samplerLayoutBinding };
+    VkDescriptorSetLayoutCreateInfo textureLayoutInfo{};
+    textureLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    textureLayoutInfo.bindingCount = 1;
+    textureLayoutInfo.pBindings = &samplerLayoutBinding;
 
-    VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
-    descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorLayoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    descriptorLayoutInfo.pBindings = bindings.data();
-
-    if (vkCreateDescriptorSetLayout(ctx.device, &descriptorLayoutInfo, nullptr, &ctx.descriptorSetLayout) != VK_SUCCESS) {
-        ENGINE_LOG_CRITICAL("Failed to create descriptor set layout");
+    if (vkCreateDescriptorSetLayout(ctx.device, &textureLayoutInfo, nullptr, &ctx.textureDescriptorSetLayout) != VK_SUCCESS) {
+        ENGINE_LOG_CRITICAL("Failed to create texture descriptor set layout");
     }
 }
 
@@ -258,13 +268,14 @@ void createDescriptorPool(VulkanContext &ctx) {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(ctx.maxFramesInFlight);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(ctx.maxFramesInFlight);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(ctx.maxTextureCount);
 
     VkDescriptorPoolCreateInfo descriptorPoolInfo{};
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
-    descriptorPoolInfo.maxSets = static_cast<uint32_t>(ctx.maxFramesInFlight);
+    descriptorPoolInfo.maxSets = static_cast<uint32_t>(ctx.maxFramesInFlight + ctx.maxTextureCount);
 
     if (vkCreateDescriptorPool(ctx.device, &descriptorPoolInfo, nullptr, &ctx.descriptorPool) != VK_SUCCESS) {
         ENGINE_LOG_CRITICAL("Failed to create descriptor pool");
@@ -273,7 +284,7 @@ void createDescriptorPool(VulkanContext &ctx) {
 
 void createDescriptorSets(VulkanContext &ctx) {
     ENGINE_LOG_TRACE("Allocating descriptor sets...");
-    std::vector<VkDescriptorSetLayout> layouts(ctx.maxFramesInFlight, ctx.descriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(ctx.maxFramesInFlight, ctx.globalDescriptorSetLayout);
 
     VkDescriptorSetAllocateInfo descriptorAllocInfo{};
     descriptorAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -312,10 +323,15 @@ void createPipelineLayout(VulkanContext &ctx) {
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(math::Mat4);
 
+    std::array<VkDescriptorSetLayout, 2> setLayouts = {
+        ctx.globalDescriptorSetLayout,
+        ctx.textureDescriptorSetLayout
+    };
+
     VkPipelineLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutInfo.setLayoutCount = 1;
-    layoutInfo.pSetLayouts = &ctx.descriptorSetLayout;
+    layoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+    layoutInfo.pSetLayouts = setLayouts.data();
     layoutInfo.pushConstantRangeCount = 1;
     layoutInfo.pPushConstantRanges = &pushConstantRange;
 

@@ -66,7 +66,8 @@ void VulkanBifrost::shutdown() {
     }
     vkDestroyPipelineLayout(m_ctx.device, m_ctx.pipelineLayout, nullptr);
     vkDestroyDescriptorPool(m_ctx.device, m_ctx.descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(m_ctx.device, m_ctx.descriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(m_ctx.device, m_ctx.globalDescriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(m_ctx.device, m_ctx.textureDescriptorSetLayout, nullptr);
     vkDestroyCommandPool(m_ctx.device, m_ctx.cmdPool, nullptr);
     for (auto view : m_ctx.swapchainImageViews) {
         vkDestroyImageView(m_ctx.device, view, nullptr);
@@ -304,7 +305,7 @@ void VulkanBifrost::setGlobalUniform(const void* data, size_t size) {
 }
 
 void VulkanBifrost::setLocalUniform(const void* data, size_t size) {
-    vkCmdPushConstants(m_ctx.cmdBuffers[m_ctx.currentFrame], m_currentPipeline->getPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, (uint32_t)size, data);
+    vkCmdPushConstants(m_ctx.cmdBuffers[m_ctx.currentFrame], m_ctx.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(size), data);
 }
 
 } // namespace midgard::bifrost::vulkan

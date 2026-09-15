@@ -32,6 +32,8 @@ struct VulkanContext {
     uint32_t maxFramesInFlight = 3;
     uint32_t currentFrame = 0;
 
+    uint32_t maxTextureCount = 256;
+
     VkInstance instance = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -63,10 +65,13 @@ struct VulkanContext {
     // Uniform Buffers
     std::vector<std::unique_ptr<VulkanBuffer>> uniformBuffers;
 
-    // Descriptors
-    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+    // Global Descriptors
+    VkDescriptorSetLayout globalDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> descriptorSets;
+
+    // Texture Descriptors
+    VkDescriptorSetLayout textureDescriptorSetLayout = VK_NULL_HANDLE;
 
     // Pipeline Layout
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;

@@ -2,7 +2,6 @@
 #include <vulkan/vulkan.h>
 
 #include "utils/log.h"
-
 #include "bifrost/texture.h"
 
 namespace midgard::bifrost::vulkan {
@@ -28,6 +27,7 @@ public:
 
     VkImageView getImageView() const { return m_imageView; }
     VkSampler getSampler() const { return m_textureSampler; }
+    VkDescriptorSet getDescriptorSet() const { return m_descriptorSet; }
 
 private:
     VulkanContext* m_ctx = nullptr;
@@ -36,6 +36,7 @@ private:
     VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
     VkImageView m_imageView = VK_NULL_HANDLE;
     VkSampler m_textureSampler = VK_NULL_HANDLE;
+    VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
 };
 
 } // namespace midgard::bifrost::vulkan

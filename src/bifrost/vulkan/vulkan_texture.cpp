@@ -131,10 +131,42 @@ VulkanTexture::VulkanTexture(const TextureDesc& desc, VulkanContext& ctx) : m_de
         ENGINE_LOG_CRITICAL("Failed to create sampler");
     }
 
+    // Allocate descriptor set (Set 1)
+    VkDescriptorSetAllocateInfo descriptorAllocInfo{};
+    descriptorAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorAllocInfo.descriptorPool = m_ctx->descriptorPool;
+    descriptorAllocInfo.descriptorSetCount = 1;
+    descriptorAllocInfo.pSetLayouts = &m_ctx->textureDescriptorSetLayout;
+
+    if (vkAllocateDescriptorSets(m_ctx->device, &descriptorAllocInfo, &m_descriptorSet) != VK_SUCCESS) {
+        ENGINE_LOG_CRITICAL("Failed to allocate descriptor set for texture");
+    }
+
+    // Write descriptor set
+    VkDescriptorImageInfo descriptorImageInfo{};
+    descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    descriptorImageInfo.imageView = m_imageView;
+    descriptorImageInfo.sampler = m_textureSampler;
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = m_descriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pImageInfo = &descriptorImageInfo;
+
+    vkUpdateDescriptorSets(m_ctx->device, 1, &descriptorWrite, 0, nullptr);
+
     ENGINE_LOG_INFO("Texture created successfully");
 }
 
 VulkanTexture::~VulkanTexture() {
+    if (m_descriptorSet != VK_NULL_HANDLE && m_ctx != nullptr && m_ctx->descriptorPool != VK_NULL_HANDLE) {
+        vkFreeDescriptorSets(m_ctx->device, m_ctx->descriptorPool, 1, &m_descriptorSet);
+        m_descriptorSet = VK_NULL_HANDLE;
+    }
     if (m_textureSampler != VK_NULL_HANDLE) {
         vkDestroySampler(m_ctx->device, m_textureSampler, nullptr);
     }

@@ -7,7 +7,7 @@ layout (location = 3) in mat4 aInstanceModel;
 layout (location = 0) out vec3 ourColor;
 layout (location = 1) out vec2 TexCoord;
 
-layout (std140, binding = 0) uniform GlobalData {
+layout (std140, set = 0, binding = 0) uniform GlobalData {
     mat4 view;
     mat4 projection;
 } u_Global;

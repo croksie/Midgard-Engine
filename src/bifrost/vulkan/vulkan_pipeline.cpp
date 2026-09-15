@@ -172,23 +172,10 @@ void VulkanPipeline::bindTexture(std::shared_ptr<Texture> texture, uint32_t slot
     ENGINE_LOG_TRACE("Binding texture...");
     if (!texture) return;
     VulkanTexture* vulkanTex = static_cast<VulkanTexture*>(texture.get());
-
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = vulkanTex->getImageView();
-    imageInfo.sampler = vulkanTex->getSampler();
-
-    VkWriteDescriptorSet descriptorWrite{};
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_ctx->descriptorSets[m_ctx->currentFrame];
-    descriptorWrite.dstBinding = slot;
-    descriptorWrite.dstArrayElement = 0;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pImageInfo = &imageInfo;
-
-    vkUpdateDescriptorSets(m_ctx->device, 1, &descriptorWrite, 0, nullptr);
-    vkCmdBindDescriptorSets(m_ctx->cmdBuffers[m_ctx->currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_ctx->descriptorSets[m_ctx->currentFrame], 0, nullptr);
+    VkDescriptorSet texSet = vulkanTex->getDescriptorSet();
+    if (texSet != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(m_ctx->cmdBuffers[m_ctx->currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 1, 1, &texSet, 0, nullptr);
+    }
 }
 
 } // namespace midgard::bifrost::vulkan
