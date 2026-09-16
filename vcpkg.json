@@ -19,6 +19,9 @@
         "vulkan",
         "vk-bootstrap",
         "shaderc",
-        "assimp"
+        "assimp",
+        "directx-dxc",
+        "spirv-cross",
+        "spirv-tools"
     ]
 }

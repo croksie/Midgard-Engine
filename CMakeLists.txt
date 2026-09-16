@@ -91,6 +91,18 @@ else()
     endif()
 endif()
 
+# 5. HLSL & SPIR-V Pipeline (DXC, SPIRV-Cross, SPIRV-Tools)
+message(STATUS "[Midgard] Finding DirectX Shader Compiler (DXC)...")
+find_package(directx-dxc CONFIG REQUIRED)
+
+message(STATUS "[Midgard] Finding SPIRV-Cross...")
+find_package(spirv_cross_core CONFIG REQUIRED)
+find_package(spirv_cross_glsl CONFIG REQUIRED)
+
+message(STATUS "[Midgard] Finding SPIRV-Tools...")
+find_package(SPIRV-Tools CONFIG REQUIRED)
+find_package(SPIRV-Tools-opt CONFIG REQUIRED)
+
 # ==============================================================================
 # Executable & Build Target
 # ==============================================================================
@@ -141,4 +153,9 @@ target_link_libraries(Midgard PRIVATE
     imgui::imgui
     vk-bootstrap::vk-bootstrap
     shaderc_target
+    Microsoft::DirectXShaderCompiler
+    spirv-cross-glsl
+    spirv-cross-core
+    SPIRV-Tools-opt
+    SPIRV-Tools-static
 )
