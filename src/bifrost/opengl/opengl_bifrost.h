@@ -31,7 +31,7 @@ public:
     void clear() override;
     void draw(std::shared_ptr<Pipeline> pipeline, uint32_t count = 1) override;
 
-    std::shared_ptr<Shader> createShader(ShaderType type, std::string source) override;
+    std::shared_ptr<Shader> createShader(ShaderType type, std::string source, bool isInstanced) override;
     std::shared_ptr<Pipeline> createPipeline(PipelineInfo& info) override;
     std::shared_ptr<Buffer> createBuffer(BufferDesc& desc) override;
     std::shared_ptr<Texture> createTexture(const TextureDesc& desc) override;

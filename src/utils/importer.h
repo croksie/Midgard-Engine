@@ -11,6 +11,8 @@
 #include "bifrost/pipeline.h"
 
 #include "scene/model.h"
+#include "utils/shader_compiler.h"
+#include "utils/log.h"
 
 namespace midgard::utils::importer {
 
@@ -79,9 +81,11 @@ inline scene::Model importModel(const std::string& pFile, bifrost::Bifrost* bifr
     // Material
     std::string assetFolder(ASSETS_PATH);
     bifrost::PipelineInfo pipelineInfo;
-    std::string vertPath = useInstance ? (assetFolder + "shaders/instance.vert") : (assetFolder + "shaders/base.vert");
-    pipelineInfo.vertexShader = bifrost->createShader(bifrost::ShaderType::VERTEX, utils::file::readTextFile(vertPath));
-    pipelineInfo.fragmentShader = bifrost->createShader(bifrost::ShaderType::FRAGMENT, utils::file::readTextFile(assetFolder + "shaders/base.frag"));
+
+    std::string shaderPath = assetFolder + "shaders/base.hlsl";
+
+    pipelineInfo.vertexShader = bifrost->createShader(bifrost::ShaderType::VERTEX, utils::file::readTextFile(shaderPath), useInstance);
+    pipelineInfo.fragmentShader = bifrost->createShader(bifrost::ShaderType::FRAGMENT, utils::file::readTextFile(shaderPath), false);
     pipelineInfo.useInstance = useInstance;
 
     auto pipeline = bifrost->createPipeline(pipelineInfo);

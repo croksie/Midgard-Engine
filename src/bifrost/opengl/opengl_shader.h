@@ -22,8 +22,10 @@ inline GLenum shaderTypeToGLType(ShaderType type) {
 
 class OpenGLShader : public Shader {
 public:
-    OpenGLShader(ShaderType type, const std::string& source);
+    OpenGLShader(ShaderType type, const std::string& source, const std::string& entryPoint = "main");
     ~OpenGLShader() override;
+
+    std::string compileShader(ShaderType type, const std::string& source, const std::string& entryPoint = "main");
 
     GLuint getShaderID() const { return m_shaderID; }
 

@@ -60,9 +60,13 @@ void OpenGLBifrost::initialize(platform::Window* window, std::shared_ptr<core::E
 
     glViewport(0, 0, m_config->windowWidth, m_config->windowHeight);
     glEnable(GL_SCISSOR_TEST);
+    glScissor(0, 0, m_config->windowWidth, m_config->windowHeight);
+    
     // DepthBuffer
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+
     // Backface-Culling
     glEnable(GL_CULL_FACE);  
     glCullFace(GL_BACK);  
@@ -138,8 +142,17 @@ void OpenGLBifrost::bindIndexBuffer(std::shared_ptr<Pipeline> pipeline, std::sha
     ENGINE_LOG_TRACE("Index buffer bound");
 }
 
-std::shared_ptr<Shader> OpenGLBifrost::createShader(ShaderType type, std::string source) {
-    return std::make_shared<OpenGLShader>(type, source);
+std::shared_ptr<Shader> OpenGLBifrost::createShader(ShaderType type, std::string source, bool isInstanced) {
+    std::string entryPoint = "main";
+    switch (type) {
+    case ShaderType::VERTEX:
+        entryPoint = isInstanced ? "VSMainInstanced" : "VSMain";
+        break;
+    case ShaderType::FRAGMENT:
+        entryPoint = "PSMain";
+        break;
+    }
+    return std::make_shared<OpenGLShader>(type, source, entryPoint);
 }
 
 std::shared_ptr<Pipeline> OpenGLBifrost::createPipeline(PipelineInfo& info) {
@@ -180,7 +193,17 @@ void OpenGLBifrost::setGlobalUniform(const void *data, size_t size) {
 
 void OpenGLBifrost::setLocalUniform(const void *data, size_t size) {
     (void)size;
-    glUniformMatrix4fv(0, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(data));
+    GLint currentProgram = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+    if (currentProgram > 0) {
+        GLint loc = glGetUniformLocation(currentProgram, "u_Local.model");
+        if (loc == -1) {
+            loc = 0;
+        }
+        glUniformMatrix4fv(loc, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(data));
+    } else {
+        glUniformMatrix4fv(0, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(data));
+    }
 }
 
 void OpenGLBifrost::draw(std::shared_ptr<Pipeline> pipeline, uint32_t count) {

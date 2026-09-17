@@ -34,8 +34,7 @@ public:
 private:
     std::vector<uint32_t> compileGLSLToSPIRV(
         const std::string& source,
-        shaderc_shader_kind kind,
-        const std::string& filename = "shader.glsl",
+        ShaderType kind,
         const std::string& entryPoint = "main");
 
     VkDevice m_device = VK_NULL_HANDLE;

@@ -295,8 +295,18 @@ void VulkanBifrost::bindPipeline(Pipeline *pipeline) {
     vkCmdBindPipeline(m_ctx.cmdBuffers[m_ctx.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getPipeline());
 }
 
-std::shared_ptr<Shader> VulkanBifrost::createShader(ShaderType type, std::string source) {
-    return std::make_shared<VulkanShader>(m_ctx.device, type, source);
+std::shared_ptr<Shader> VulkanBifrost::createShader(ShaderType type, std::string source, bool isInstanced) {
+    std::string entryPoint = "main";
+    switch (type) {
+    case ShaderType::VERTEX:
+        entryPoint = isInstanced ? "VSMainInstanced" : "VSMain";
+        break;
+    case ShaderType::FRAGMENT:
+        entryPoint = "PSMain";
+        break;
+    }
+    
+    return std::make_shared<VulkanShader>(m_ctx.device, type, source, entryPoint);
 }
 
 void VulkanBifrost::setGlobalUniform(const void* data, size_t size) {

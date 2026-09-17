@@ -77,7 +77,7 @@ public:
      * @param source The source code of the shader.
      * @return A shared pointer to the created shader.
      */
-    virtual std::shared_ptr<Shader> createShader(ShaderType type, std::string source) = 0;
+    virtual std::shared_ptr<Shader> createShader(ShaderType type, std::string source, bool isInstanced) = 0;
     /**
      * @brief Creates a new rendering pipeline.
      * @param info The information for creating the pipeline.

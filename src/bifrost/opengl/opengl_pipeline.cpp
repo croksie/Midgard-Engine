@@ -19,6 +19,14 @@ OpenGLPipeline::OpenGLPipeline(PipelineInfo& info) {
     glAttachShader(m_shaderProgamID, vertexShader);
     glAttachShader(m_shaderProgamID, fragmentShader);
     glLinkProgram(m_shaderProgamID);
+
+    GLint success;
+    glGetProgramiv(m_shaderProgamID, GL_LINK_STATUS, &success);
+    if (!success) {
+        GLchar infoLog[512];
+        glGetProgramInfoLog(m_shaderProgamID, 512, NULL, infoLog);
+        ENGINE_LOG_ERROR("OpenGL Program linking failed: {}", infoLog);
+    }
 }
 
 OpenGLPipeline::~OpenGLPipeline() {
