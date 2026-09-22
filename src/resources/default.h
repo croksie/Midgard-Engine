@@ -17,7 +17,7 @@ public:
     static std::shared_ptr<bifrost::Texture> getDefaultTexture() { return s_defaultTexture; }
 
 private:
-    static std::shared_ptr<bifrost::Texture> s_defaultTexture;
+    inline  static std::shared_ptr<bifrost::Texture> s_defaultTexture = nullptr;
 
 };
 

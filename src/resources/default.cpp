@@ -4,8 +4,6 @@
 
 namespace midgard::resource {
 
-std::shared_ptr<bifrost::Texture> DefaultResources::s_defaultTexture = nullptr;
-
 void DefaultResources::init(bifrost::Bifrost* bifrost) {
     uint32_t white = 0xFFFFFFFF;
     bifrost::TextureDesc texDesc{};

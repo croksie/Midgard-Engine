@@ -15,7 +15,7 @@ ConstantBuffer<GlobalData> u_Global : register(b0, space0);
 
 struct VSOutput {
     float4 pos : SV_Position;
-    [[vk::location(0)]] float3 col : COLOR0;
+    [[vk::location(0)]] float3 normal : NORMAL;
     [[vk::location(1)]] float2 texCoord : TEXCOORD0;
 };
 
@@ -23,7 +23,7 @@ struct VSOutput {
 
 struct VSInputStandard {
     [[vk::location(0)]] float3 pos : POSITION;
-    [[vk::location(1)]] float3 col : COLOR;
+    [[vk::location(1)]] float3 normal : NORMAL;
     [[vk::location(2)]] float2 texCoord : TEXCOORD0;
 };
 
@@ -41,7 +41,7 @@ VSOutput VSMain(VSInputStandard input) {
     pos = mul(pos, u_Global.view);
     pos = mul(pos, u_Global.projection);
     output.pos = pos;
-    output.col = input.col;
+    output.normal = input.normal;
     output.texCoord = input.texCoord;
     return output;
 }
@@ -50,7 +50,7 @@ VSOutput VSMain(VSInputStandard input) {
 
 struct VSInputInstanced {
     [[vk::location(0)]] float3 pos : POSITION;
-    [[vk::location(1)]] float3 col : COLOR;
+    [[vk::location(1)]] float3 normal : NORMAL;
     [[vk::location(2)]] float2 texCoord : TEXCOORD0;
     [[vk::location(3)]] float4x4 instanceModel : INSTANCE_MODEL; // Spans locations 3, 4, 5, 6
 };
@@ -63,7 +63,7 @@ VSOutput VSMainInstanced(VSInputInstanced input) {
     pos = mul(pos, u_Global.view);
     pos = mul(pos, u_Global.projection);
     output.pos = pos;
-    output.col = input.col;
+    output.normal = input.normal;
     output.texCoord = input.texCoord;
     return output;
 }
@@ -71,7 +71,7 @@ VSOutput VSMainInstanced(VSInputInstanced input) {
 // --- Fragment Stage ---
 
 struct PSInput {
-    [[vk::location(0)]] float3 col : COLOR0;
+    [[vk::location(0)]] float3 normal : NORMAL;
     [[vk::location(1)]] float2 texCoord : TEXCOORD0;
 };
 
@@ -84,7 +84,17 @@ Texture2D u_Texture : register(t0, space1);
 SamplerState u_Sampler : register(s0, space1);
 
 float4 PSMain(PSInput input) : SV_Target {
-    return u_Texture.Sample(u_Sampler, input.texCoord) * float4(input.col, 1.0f);
+
+    float4 texColor = u_Texture.Sample(u_Sampler, input.texCoord);
+
+    float3 lightDir = normalize(float3(0.5f, 1.0f, -0.5f));
+    float3 normal = normalize(input.normal);
+
+    float diffuse = max(dot(normal, lightDir), 0.0f);
+    float ambient = 0.2f;
+    float lighting = ambient + diffuse * 0.8f;
+    
+    return float4(texColor.rgb * lighting, texColor.a);
 }
 
 
