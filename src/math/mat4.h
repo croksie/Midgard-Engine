@@ -44,6 +44,14 @@ struct Mat4 {
         return Vec4(res);
     }
 
+    Vec4& operator[](size_t index) {
+        return reinterpret_cast<Vec4&>(elements[index]);
+    }
+
+    const Vec4& operator[](size_t index) const {
+        return reinterpret_cast<const Vec4&>(elements[index]);
+    }
+
     Mat4 translate(const Vec3& v) {
         return Mat4(glm::translate(this->toGlm(), v.toGlm()));
     }

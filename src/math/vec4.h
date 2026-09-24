@@ -36,6 +36,9 @@ struct Vec4 {
     bool operator==(const Vec4& other) const { return x == other.x && y == other.y && z == other.z && w == other.w; }
     bool operator!=(const Vec4& other) const { return !(*this == other); }
 
+    float& operator[](size_t index) { return (&x)[index]; }
+    const float& operator[](size_t index) const { return (&x)[index]; }
+
     float length() const { return std::sqrt(x * x + y * y + z * z + w * w); }
     float lengthSquared() const { return x * x + y * y + z * z + w * w; }
 
