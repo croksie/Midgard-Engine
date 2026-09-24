@@ -108,7 +108,7 @@ find_package(SPIRV-Tools-opt CONFIG REQUIRED)
 # ==============================================================================
 
 # Collect engine sources and headers
-file(GLOB_RECURSE ENGINE_SOURCES 
+file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     "src/*.cpp" 
     "src/*.c" 
     "src/*.h" 
