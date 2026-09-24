@@ -58,7 +58,10 @@ void Renderer::initialize(platform::Window *window, std::shared_ptr<core::Engine
     
     m_sceneGraph = std::make_shared<midgard::scene::SceneGraph>();
 
-    m_sceneGraph->addModel(utils::importer::importModel(assetFolder + "model/suzanne.glb", m_rhi.get(), false));
+    std::vector<scene::Model> importedModels = utils::importer::importModel(assetFolder + "model/suzanne.glb", m_rhi.get(), false);
+    for(scene::Model importedModel : importedModels){
+        m_sceneGraph->addModel(importedModel);
+    }
 
     ENGINE_LOG_INFO("Renderer initialized");
 }
@@ -141,6 +144,7 @@ void Renderer::render() {
 
 void Renderer::shutdown() {
     ENGINE_LOG_DEBUG("Renderer shutting down ...");
+    m_sceneGraph = nullptr;
     resource::DefaultResources::shutdown();
     m_rhi->shutdown(); // Ensure to have free all buffer and pipeline before
 }
