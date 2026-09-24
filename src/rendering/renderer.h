@@ -19,6 +19,10 @@ namespace midgard::bifrost {
     class Texture;
 }
 
+namespace midgard::scene {
+    class SceneGraph;
+}
+
 namespace midgard::render {
 
 class Renderer {
@@ -34,15 +38,8 @@ private:
     std::shared_ptr<core::EngineConfig> m_config;
     std::unique_ptr<bifrost::Bifrost> m_rhi;
 
+    std::shared_ptr<scene::SceneGraph> m_sceneGraph;
     scene::Camera m_camera;
-
-    std::vector<scene::Model> models;
-    scene::Model m_model;
-
-    std::vector<bifrost::InstanceData> m_instances = std::vector<bifrost::InstanceData>(900);
-    std::shared_ptr<bifrost::Buffer> m_instanceBuffer;
-
-    void createTestModel();
 
     float m_lastFrameTime = 0.0f;
     double m_lastMouseX = 0.0;
