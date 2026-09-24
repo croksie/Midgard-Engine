@@ -10,8 +10,11 @@
 #include "bifrost/buffer.h"
 #include "bifrost/pipeline.h"
 
+#include "resources/mesh.h"
+#include "resources/material.h"
 #include "scene/model.h"
 #include "utils/shader_compiler.h"
+#include "utils/file_utils.h"
 #include "utils/log.h"
 
 namespace midgard::utils::importer {
