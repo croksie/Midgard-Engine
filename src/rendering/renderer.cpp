@@ -58,7 +58,7 @@ void Renderer::initialize(platform::Window *window, std::shared_ptr<core::Engine
     
     m_sceneGraph = std::make_shared<midgard::scene::SceneGraph>();
 
-    std::vector<scene::Model> importedModels = utils::importer::importModel(assetFolder + "model/suzanne.glb", m_rhi.get(), false);
+    std::vector<scene::Model> importedModels = utils::importer::importModel(assetFolder + "model/t34.glb", m_rhi.get(), false);
     for(scene::Model importedModel : importedModels){
         m_sceneGraph->addModel(importedModel);
     }
