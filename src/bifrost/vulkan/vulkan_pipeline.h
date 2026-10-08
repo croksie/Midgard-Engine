@@ -12,7 +12,7 @@ namespace midgard::bifrost::vulkan {
 class VulkanPipeline : public Pipeline {
 public:
     VulkanPipeline() = delete;
-    VulkanPipeline(PipelineInfo& info, VulkanContext& ctx, VkPipelineLayout pipelineLayout);
+    VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkPipelineLayout pipelineLayout);
     ~VulkanPipeline() override;
 
     void bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) override;

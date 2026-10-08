@@ -77,19 +77,19 @@ public:
      * @param source The source code of the shader.
      * @return A shared pointer to the created shader.
      */
-    virtual std::shared_ptr<Shader> createShader(ShaderType type, std::string source, bool isInstanced) = 0;
+    virtual std::shared_ptr<Shader> createShader(ShaderType type, const std::string& source, bool isInstanced) = 0;
     /**
      * @brief Creates a new rendering pipeline.
      * @param info The information for creating the pipeline.
      * @return A shared pointer to the created pipeline.
      */
-    virtual std::shared_ptr<Pipeline> createPipeline(PipelineInfo& info) = 0;
+    virtual std::shared_ptr<Pipeline> createPipeline(const PipelineInfo& info) = 0;
     /**
      * @brief Creates a new buffer.
      * @param desc The description for creating the buffer.
      * @return A shared pointer to the created buffer.
      */
-    virtual std::shared_ptr<Buffer> createBuffer(BufferDesc& desc) = 0;
+    virtual std::shared_ptr<Buffer> createBuffer(const BufferDesc& desc) = 0;
     /**
      * @brief Creates a new texture.
      * @param desc The description for creating the texture.

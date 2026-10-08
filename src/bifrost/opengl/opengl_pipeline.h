@@ -10,7 +10,7 @@ namespace midgard::bifrost::opengl {
 
 class OpenGLPipeline : public Pipeline {
 public:
-    OpenGLPipeline(PipelineInfo& info);
+    OpenGLPipeline(const PipelineInfo& info);
     ~OpenGLPipeline() override;
     
     void bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) override;

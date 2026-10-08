@@ -9,7 +9,7 @@
 
 namespace midgard::bifrost::opengl {
 
-OpenGLPipeline::OpenGLPipeline(PipelineInfo& info) {
+OpenGLPipeline::OpenGLPipeline(const PipelineInfo& info) {
     glCreateVertexArrays(1, &m_vertexArrayID);
 
     GLuint vertexShader = static_cast<OpenGLShader*>(info.vertexShader.get())->getShaderID();

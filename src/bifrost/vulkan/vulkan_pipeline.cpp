@@ -10,7 +10,7 @@
 
 namespace midgard::bifrost::vulkan {
 
-VulkanPipeline::VulkanPipeline(PipelineInfo& info, VulkanContext& ctx, VkPipelineLayout pipelineLayout) 
+VulkanPipeline::VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkPipelineLayout pipelineLayout) 
     : m_ctx(&ctx), m_pipelineLayout(pipelineLayout) 
 {
     // Shaders

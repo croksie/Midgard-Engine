@@ -10,7 +10,7 @@ namespace midgard::bifrost {
 
 class PipelineManager {
 public:
-    std::shared_ptr<Pipeline> getOrCreatePipeline(Bifrost* rhi, std::string name, const PipelineInfo& pi) {
+    std::shared_ptr<Pipeline> getOrCreatePipeline(Bifrost* rhi, const std::string& name, const PipelineInfo& pi) {
         auto it = m_pipelines.find(name);
         if(it != m_pipelines.cend()) {
             if (auto pipeline = it->second.lock()) {
