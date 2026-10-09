@@ -1,21 +1,19 @@
 #pragma once
-#include <unordered_map>
+#include <vector>
 
-#include <scene/model.h>
 #include <scene/camera.h>
+#include <rendering/render_packet.h>
 
 
 namespace midgard::renderer {
 
 class RenderScene {
 public:
-
-
-
     scene::Camera getCamera() { return m_camera; }
 
 private:
-    std::unordered_map<uint32_t, scene::Model> m_models;
+    std::vector<render::SingleDrawPacket> m_singleDraws;
+    std::vector<render::InstancedDrawPacket> m_intancedDraws;
     scene::Camera m_camera;
 
 };
