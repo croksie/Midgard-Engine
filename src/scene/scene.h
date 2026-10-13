@@ -1,22 +1,28 @@
 #pragma once
 #include <vector>
+#include <memory>
 
-#include "scene/model.h"
+#include "scene/camera.h"
+
+namespace midgard::renderer {
+    class RenderScene;
+}
 
 namespace midgard::scene {
 
-class Model;
+class SceneNode;
 
 class SceneGraph {
 public:
 
-    const std::vector<Model>& getModels() const { return m_models; }
+    void setRootNode(std::unique_ptr<SceneNode> node) { m_rootNode = std::move(node); }
 
-    void addModel(const Model& model);
+    const renderer::RenderScene& generateRenderScene();
 
 private:
 
-    std::vector<Model> m_models;
+    std::unique_ptr<SceneNode> m_rootNode;
+    Camera m_camera;
 };
 
 

@@ -1,10 +1,11 @@
 #include "scene/scene.h"
+#include <rendering/render_scene.h>
 
 namespace midgard::scene {
 
-void SceneGraph::addModel(const Model &model)
-{
-    m_models.push_back(model);
-}
+    const renderer::RenderScene &SceneGraph::generateRenderScene()
+    {
+        // TODO: insert return statement here
+    }
 
 } // namespace midgard::scene
