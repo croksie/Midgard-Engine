@@ -10,7 +10,7 @@ namespace midgard::renderer {
 class RenderScene {
 public:
     scene::Camera getCamera() { return m_camera; }
-
+    void setCamera(scene::Camera camera) { m_camera = camera; }
 private:
     std::vector<render::SingleDrawPacket> m_singleDraws;
     std::vector<render::InstancedDrawPacket> m_intancedDraws;
