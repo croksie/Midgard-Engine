@@ -14,7 +14,8 @@ OpenGLBuffer::~OpenGLBuffer() {
 }
 
 void OpenGLBuffer::setData(size_t size, const void* data, size_t offset) {
-    m_desc.size = size;
+    if (offset + size > m_desc.size)
+        return;
     glNamedBufferSubData(m_bufferID, offset, size, data);
 }
 

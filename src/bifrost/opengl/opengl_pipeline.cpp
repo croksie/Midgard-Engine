@@ -53,12 +53,7 @@ void OpenGLPipeline::bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) {
 
     GLuint vaoBindingPoint = 0;
     ENGINE_LOG_TRACE("Creating VAO...");
-    glVertexArrayVertexBuffer(
-        m_vertexArrayID,
-        vaoBindingPoint,
-        buffer->getBufferId(),
-        0,
-        sizeof(Vertex));
+    glVertexArrayVertexBuffer(m_vertexArrayID, vaoBindingPoint, buffer->getBufferId(), 0, sizeof(Vertex));
 
     m_numberOfVerticesInBindedObject = static_cast<GLsizei>(buffer->getSize() / sizeof(Vertex));
     ENGINE_LOG_TRACE("VAO Created");
@@ -75,7 +70,7 @@ void OpenGLPipeline::bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) {
     glVertexArrayAttribBinding(m_vertexArrayID, attribTexCoord, vaoBindingPoint);
 }
 
-void OpenGLPipeline::bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer) {
+void OpenGLPipeline::bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer, uint32_t offset) {
     ENGINE_LOG_TRACE("Instance buffer binding...");
     OpenGLBuffer* buffer = static_cast<OpenGLBuffer*>(instanceBuffer.get());
 
@@ -85,12 +80,7 @@ void OpenGLPipeline::bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer) 
     }
 
     GLuint vaoBindingPoint = 1;
-    glVertexArrayVertexBuffer(
-        m_vertexArrayID,
-        vaoBindingPoint,
-        buffer->getBufferId(),
-        0,
-        sizeof(InstanceData));
+    glVertexArrayVertexBuffer(m_vertexArrayID, vaoBindingPoint, buffer->getBufferId(), offset, sizeof(InstanceData));
 
     glVertexArrayBindingDivisor(m_vertexArrayID, vaoBindingPoint, 1);
 
@@ -122,5 +112,3 @@ void OpenGLPipeline::bindTexture(std::shared_ptr<Texture> texture, uint32_t slot
 }
 
 } // namespace midgard::bifrost::opengl
-
-

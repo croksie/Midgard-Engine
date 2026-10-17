@@ -7,7 +7,6 @@
 
 #include "bifrost/vulkan/vulkan_initializer.h"
 
-
 namespace midgard::bifrost::vulkan {
 
 VulkanBuffer::VulkanBuffer(const BufferDesc& desc, const VulkanContext& ctx) : m_ctx(ctx), m_desc(desc) {
@@ -29,7 +28,9 @@ VulkanBuffer::VulkanBuffer(const BufferDesc& desc, const VulkanContext& ctx) : m
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(ctx, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    allocInfo.memoryTypeIndex =
+        findMemoryType(ctx, memRequirements.memoryTypeBits,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     result = vkAllocateMemory(ctx.device, &allocInfo, nullptr, &m_bufferMemory);
     if (result != VK_SUCCESS) {
@@ -45,10 +46,10 @@ VulkanBuffer::VulkanBuffer(const BufferDesc& desc, const VulkanContext& ctx) : m
     if (result != VK_SUCCESS) {
         ENGINE_LOG_CRITICAL("Failed to map memory. Vulkan error Code : {}", static_cast<int>(result));
     }
-    
+
     // Copy data to buffer if data is provided
     if (desc.initData != nullptr) {
-        memcpy(m_bufferData, desc.initData, (size_t) bufferInfo.size);
+        memcpy(m_bufferData, desc.initData, (size_t)bufferInfo.size);
     }
 }
 
@@ -61,14 +62,12 @@ VulkanBuffer::~VulkanBuffer() {
     }
 }
 
-void VulkanBuffer::setData(size_t size, const void *data, size_t offset) {
+void VulkanBuffer::setData(size_t size, const void* data, size_t offset) {
     if (offset + size > m_desc.size) {
         ENGINE_LOG_ERROR("Buffer overflow, data was not set.");
         return;
     }
-    m_desc.size = size;
-    memcpy(m_bufferData, data, (size_t) size);
+    memcpy(m_bufferData, data, (size_t)size);
 }
 
 } // namespace midgard::bifrost::vulkan
-

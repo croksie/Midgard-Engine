@@ -9,21 +9,20 @@
 #include "bifrost/shader.h"
 
 namespace midgard::platform {
-    class Window;
+class Window;
 }
 
 namespace midgard::core {
-    struct EngineConfig;
+struct EngineConfig;
 }
 
 namespace midgard::bifrost {
-    struct PipelineInfo;
-    class Pipeline;
-    struct BufferDesc;
-    class Buffer;
-    struct TextureDesc;
-    class Texture;
-
+struct PipelineInfo;
+class Pipeline;
+struct BufferDesc;
+class Buffer;
+struct TextureDesc;
+class Texture;
 
 /**
  * @brief Vertex structure representing a single vertex in 3D space.
@@ -32,7 +31,7 @@ namespace midgard::bifrost {
 struct Vertex {
     math::Vec3 position;
     math::Vec3 normals;
-    math::Vec2 texCoords; 
+    math::Vec2 texCoords;
 };
 
 /**
@@ -113,7 +112,8 @@ public:
      * @param pipeline The pipeline to bind the buffer to.
      * @param buffer The buffer to bind.
      */
-    virtual void bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer) = 0;
+    virtual void bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer,
+                                    uint32_t offset) = 0;
     /**
      * @brief Binds an index buffer to the specified pipeline.
      * @param pipeline The pipeline to bind the buffer to.
@@ -126,18 +126,19 @@ public:
      * @param texture The texture to bind.
      * @param slot The texture slot to bind the texture to.
      */
-    virtual void bindTexture(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Texture> texture, uint32_t slot = 0) = 0;
+    virtual void bindTexture(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Texture> texture,
+                             uint32_t slot = 0) = 0;
 
     /**
      * @brief Set global uniform data for the shaders.
-     * 
+     *
      * @param data A pointer to a Uniform Buffer.
      * @param size The size of the data in bytes.
      */
     virtual void setGlobalUniform(const void* data, size_t size) = 0;
     /**
      * @brief Set local uniform data for the shaders.
-     * 
+     *
      * @param data A pointer to a Uniform Buffer.
      * @param size The size of the data in bytes.
      */
@@ -145,7 +146,7 @@ public:
 
     /**
      * @brief Initialize the Bifrost API.
-     * 
+     *
      * @param window The window to initialize with.
      * @param config The engine configuration.
      */

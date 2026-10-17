@@ -12,9 +12,9 @@ class OpenGLPipeline : public Pipeline {
 public:
     OpenGLPipeline(const PipelineInfo& info);
     ~OpenGLPipeline() override;
-    
+
     void bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) override;
-    void bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer) override;
+    void bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer, uint32_t offets) override;
     void bindIndexBuffer(std::shared_ptr<Buffer> indexBuffer) override;
     void bindTexture(std::shared_ptr<Texture> texture, uint32_t slot = 0) override;
 

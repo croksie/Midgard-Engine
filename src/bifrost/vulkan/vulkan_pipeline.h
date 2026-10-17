@@ -1,13 +1,13 @@
 #pragma once
-#include <memory>
 #include <cstdint>
+#include <memory>
 
 #include <vulkan/vulkan.h>
 
 #include "bifrost/pipeline.h"
 
 namespace midgard::bifrost::vulkan {
-    struct VulkanContext;
+struct VulkanContext;
 
 class VulkanPipeline : public Pipeline {
 public:
@@ -16,7 +16,7 @@ public:
     ~VulkanPipeline() override;
 
     void bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) override;
-    void bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer) override;
+    void bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer, uint32_t offset) override;
     void bindIndexBuffer(std::shared_ptr<Buffer> indexBuffer) override;
     void bindTexture(std::shared_ptr<Texture> texture, uint32_t slot = 0) override;
 

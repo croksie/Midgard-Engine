@@ -3,24 +3,21 @@
 #include "utils/log.h"
 
 #include "bifrost/bifrost.h"
-#include "bifrost/vulkan/vulkan_initializer.h"
 #include "bifrost/vulkan/vulkan_buffer.h"
+#include "bifrost/vulkan/vulkan_initializer.h"
 #include "bifrost/vulkan/vulkan_shader.h"
 #include "bifrost/vulkan/vulkan_texture.h"
 
 namespace midgard::bifrost::vulkan {
 
-VulkanPipeline::VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkPipelineLayout pipelineLayout) 
-    : m_ctx(&ctx), m_pipelineLayout(pipelineLayout) 
-{
+VulkanPipeline::VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkPipelineLayout pipelineLayout)
+    : m_ctx(&ctx), m_pipelineLayout(pipelineLayout) {
     // Shaders
     auto vertShader = std::static_pointer_cast<VulkanShader>(info.vertexShader);
     auto fragShader = std::static_pointer_cast<VulkanShader>(info.fragmentShader);
-    
-    VkPipelineShaderStageCreateInfo shaderStages[] = {
-        vertShader->getStageCreateInfo(),
-        fragShader->getStageCreateInfo()
-    };
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShader->getStageCreateInfo(),
+                                                      fragShader->getStageCreateInfo()};
 
     // VertexDescription
     std::vector<VkVertexInputBindingDescription> bindingDescs;
@@ -32,7 +29,7 @@ VulkanPipeline::VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkP
     attribDescs.push_back({0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0});
     attribDescs.push_back({1, 0, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)});
     attribDescs.push_back({2, 0, VK_FORMAT_R32G32_SFLOAT, 6 * sizeof(float)});
-    
+
     if (info.useInstance) {
         m_useInstance = true;
         // Binding 1 : Instance
@@ -57,10 +54,7 @@ VulkanPipeline::VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkP
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     // Viewport and Scissor dynamic state
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
     dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
@@ -93,8 +87,8 @@ VulkanPipeline::VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkP
 
     // Color Blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | 
-                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
@@ -147,34 +141,39 @@ void VulkanPipeline::bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) {
 
     vkCmdBindPipeline(m_ctx->cmdBuffers[m_ctx->currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 0, 1, vulkanVertexBuffer->getBufferHandle(), offsets);
+    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 0, 1, vulkanVertexBuffer->getBufferHandle(),
+                           offsets);
 
     m_numberOfVerticesInBindedObject = static_cast<uint32_t>(vulkanVertexBuffer->getSize() / sizeof(Vertex));
 }
 
-void VulkanPipeline::bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer) {
+void VulkanPipeline::bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer, uint32_t offset) {
     if (!m_useInstance) {
         ENGINE_LOG_ERROR("Pipeline isn't created with instance support");
         return;
     }
     VulkanBuffer* vulkanInstanceBuffer = static_cast<VulkanBuffer*>(instanceBuffer.get());
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 1, 1, vulkanInstanceBuffer->getBufferHandle(), offsets);
+    VkDeviceSize offsets[] = {offset};
+    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 1, 1, vulkanInstanceBuffer->getBufferHandle(),
+                           offsets);
 }
 
 void VulkanPipeline::bindIndexBuffer(std::shared_ptr<Buffer> indexBuffer) {
     VulkanBuffer* vulkanIndexBuffer = static_cast<VulkanBuffer*>(indexBuffer.get());
-    vkCmdBindIndexBuffer(m_ctx->cmdBuffers[m_ctx->currentFrame], *vulkanIndexBuffer->getBufferHandle(), 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(m_ctx->cmdBuffers[m_ctx->currentFrame], *vulkanIndexBuffer->getBufferHandle(), 0,
+                         VK_INDEX_TYPE_UINT32);
     m_numberOfIndicesInBindedObject = static_cast<uint32_t>(vulkanIndexBuffer->getSize() / sizeof(uint32_t));
 }
 
 void VulkanPipeline::bindTexture(std::shared_ptr<Texture> texture, uint32_t slot) {
     ENGINE_LOG_TRACE("Binding texture...");
-    if (!texture) return;
+    if (!texture)
+        return;
     VulkanTexture* vulkanTex = static_cast<VulkanTexture*>(texture.get());
     VkDescriptorSet texSet = vulkanTex->getDescriptorSet();
     if (texSet != VK_NULL_HANDLE) {
-        vkCmdBindDescriptorSets(m_ctx->cmdBuffers[m_ctx->currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 1, 1, &texSet, 0, nullptr);
+        vkCmdBindDescriptorSets(m_ctx->cmdBuffers[m_ctx->currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                m_pipelineLayout, 1, 1, &texSet, 0, nullptr);
     }
 }
 
