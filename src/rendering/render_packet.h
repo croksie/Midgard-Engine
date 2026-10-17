@@ -5,12 +5,12 @@
 #include <math/mat4.h>
 
 namespace midgard::resource {
-    class Mesh;
-    class Material;
-}
+class Mesh;
+class Material;
+} // namespace midgard::resource
 
 namespace midgard::bifrost {
-    class Buffer;
+class Buffer;
 }
 
 namespace midgard::render {
@@ -24,8 +24,7 @@ struct SingleDrawPacket {
 struct InstancedDrawPacket {
     std::shared_ptr<resource::Mesh> mesh;
     std::shared_ptr<resource::Material> material;
-    std::shared_ptr<bifrost::Buffer> instanceBuffer;
-    uint32_t instanceCount;
+    std::vector<math::Mat4> instanceTransforms;
 };
 
 } // namespace midgard::render

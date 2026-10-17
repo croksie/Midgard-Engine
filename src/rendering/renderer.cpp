@@ -1,5 +1,6 @@
 #include "rendering/renderer.h"
 
+#include <memory>
 #include <string>
 
 #include <glm/glm.hpp>
@@ -9,7 +10,6 @@
 #include <stb_image.h>
 
 #include "math/math.h"
-#include "resources/default.h"
 #include "utils/file_utils.h"
 #include "utils/importer.h"
 #include "utils/log.h"
@@ -20,32 +20,42 @@
 #include "bifrost/shader.h"
 #include "bifrost/texture.h"
 #include "bifrost/vulkan/vulkan_bifrost.h"
+
 #include "core/config.h"
 #include "platform/input/input.h"
 #include "platform/window/window.h"
+#include "rendering/render_packet.h"
+#include "rendering/render_scene.h"
+#include "resources/default.h"
 #include "resources/material.h"
 #include "resources/mesh.h"
 #include "scene/scene.h"
 
-namespace midgard::render
-{
+namespace midgard::render {
 
 std::string assetFolder(ASSETS_PATH);
 
-void Renderer::initialize(platform::Window *window, std::shared_ptr<core::EngineConfig> config) {
+void Renderer::initialize(platform::Window* window, std::shared_ptr<core::EngineConfig> config) {
     ENGINE_LOG_INFO("Renderer initializing ...");
     m_config = config;
 
     // Init Bifrost
     switch (m_config->api) {
-    case core::GraphicsAPI::OpenGL:
-        m_rhi = std::make_unique<bifrost::opengl::OpenGLBifrost>();
-        break;
-    case core::GraphicsAPI::Vulkan:
-        m_rhi = std::make_unique<bifrost::vulkan::VulkanBifrost>();
-        break;
+        case core::GraphicsAPI::OpenGL:
+            m_rhi = std::make_unique<bifrost::opengl::OpenGLBifrost>();
+            break;
+        case core::GraphicsAPI::Vulkan:
+            m_rhi = std::make_unique<bifrost::vulkan::VulkanBifrost>();
+            break;
     }
     m_rhi->initialize(window, m_config);
+
+    // Init instance buffer
+    bifrost::BufferDesc instanceBufDesc{};
+    instanceBufDesc.type = bifrost::BufferType::VERTEX;
+    instanceBufDesc.size = MAX_INSTANCES * sizeof(bifrost::InstanceData);
+    instanceBufDesc.initData = nullptr;
+    m_instanceBuffer = m_rhi->createBuffer(instanceBufDesc);
 
     // Init default Resources
     resource::DefaultResources::init(m_rhi.get());
@@ -55,13 +65,11 @@ void Renderer::initialize(platform::Window *window, std::shared_ptr<core::Engine
     m_camera = scene::Camera(cameraConfig);
 
     // Init SceneGraph
-    
     m_sceneGraph = std::make_shared<midgard::scene::SceneGraph>();
 
-    std::vector<scene::Model> importedModels = utils::importer::importModel(assetFolder + "model/t34.glb", m_rhi.get(), false);
-    for(scene::Model importedModel : importedModels){
-        m_sceneGraph->addModel(importedModel);
-    }
+    std::unique_ptr<scene::SceneNode> rootNode = std::make_unique<scene::SceneNode>(
+        utils::importer::importModel(assetFolder + "model/voiture.glb", m_rhi.get()));
+    m_sceneGraph->setRootNode(std::move(rootNode));
 
     ENGINE_LOG_INFO("Renderer initialized");
 }
@@ -99,11 +107,11 @@ void Renderer::render() {
     if (platform::Input::isKeyPressed(platform::KeyCode::Space))
         m_camera.processKeyboard(math::Vec3(0.0f, 1.0f, 0.0f), deltaTime);
 
+    // World martrix
     glm::mat4 matrices[2] = {m_camera.getViewMatrix(), m_camera.getProjectionMatrix()};
-    const void *data = matrices;
+    const void* data = matrices;
 
-
-    const std::vector<scene::Model>& models = m_sceneGraph->getModels();
+    renderer::RenderScene renderScene = m_sceneGraph->generateRenderScene();
 
     ENGINE_LOG_TRACE("Render start");
     m_rhi->beginFrame();
@@ -111,32 +119,31 @@ void Renderer::render() {
     m_rhi->setGlobalUniform(data, sizeof(matrices));
 
     // Render unique models
-    for (auto &model : models) {
-        std::shared_ptr<resource::Mesh> mesh = model.getMesh();
-        std::shared_ptr<resource::Material> material = model.getMaterial();
-
-        math::Mat4 modelMat = model.getTransform();
-        m_rhi->bindPipeline(material->getPipeline().get());
-        m_rhi->bindVertexBuffer(material->getPipeline(), mesh->getVertexBuffer());
-        m_rhi->bindIndexBuffer(material->getPipeline(), mesh->getIndexBuffer());
-        m_rhi->setLocalUniform(&modelMat, sizeof(math::Mat4));
-        m_rhi->bindTexture(material->getPipeline(), material->getTexture(), 0);
-        m_rhi->draw(material->getPipeline());
+    for (const auto& packet : renderScene.m_singleDraws) {
+        auto pipeline = packet.material->getPipeline(false);
+        m_rhi->bindPipeline(pipeline.get());
+        m_rhi->bindVertexBuffer(pipeline, packet.mesh->getVertexBuffer());
+        m_rhi->bindIndexBuffer(pipeline, packet.mesh->getIndexBuffer());
+        m_rhi->setLocalUniform(&packet.worldTransform, sizeof(math::Mat4));
+        m_rhi->bindTexture(pipeline, packet.material->getTexture(), 0);
+        m_rhi->draw(pipeline, 1);
     }
 
-    // const float time = static_cast<float>(glfwGetTime());
-    // const glm::mat4 baseRotation =
-    //     glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(-55.0f),
-    //                             glm::vec3(1.0f, 0.0f, 0.0f)),
-    //                 time * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
+    // Render instanced models
+    size_t currentInstanceOffset = 0;
+    for (const auto& packet : renderScene.m_intancedDraws) {
+        size_t dataSize = packet.instanceTransforms.size() * sizeof(math::Mat4);
 
-    // for (size_t i = 0; i < models.size(); ++i) {
-    //     glm::mat4 modelMat = baseRotation;
-    //     modelMat[3] = glm::vec4(models[i].getPosition().toGlm(), 1.0f);
-    //     m_instances[i].modelMatrix = math::Mat4(modelMat);
-    // }
+        m_instanceBuffer->setData(dataSize, packet.instanceTransforms.data(), currentInstanceOffset);
 
-    // m_instanceBuffer->setData(m_instances.size() * sizeof(bifrost::InstanceData), m_instances.data());
+        auto pipeline = packet.material->getPipeline(true);
+        m_rhi->bindPipeline(pipeline.get());
+        m_rhi->bindVertexBuffer(pipeline, packet.mesh->getVertexBuffer());
+        m_rhi->bindInstanceBuffer(pipeline, m_instanceBuffer, static_cast<uint32_t>(currentInstanceOffset));
+        m_rhi->bindIndexBuffer(pipeline, packet.mesh->getIndexBuffer());
+        m_rhi->bindTexture(pipeline, packet.material->getTexture(), 0);
+        m_rhi->draw(pipeline, static_cast<uint32_t>(packet.instanceTransforms.size()));
+    }
 
     m_rhi->endFrame();
     ENGINE_LOG_TRACE("Render end");
@@ -145,6 +152,7 @@ void Renderer::render() {
 void Renderer::shutdown() {
     ENGINE_LOG_DEBUG("Renderer shutting down ...");
     m_sceneGraph = nullptr;
+    m_instanceBuffer = nullptr;
     resource::DefaultResources::shutdown();
     m_rhi->shutdown(); // Ensure to have free all buffer and pipeline before
 }

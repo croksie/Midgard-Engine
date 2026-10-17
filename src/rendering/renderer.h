@@ -3,24 +3,25 @@
 #include <vector>
 
 #include "bifrost/bifrost.h"
-#include "scene/model.h"
+
 #include "scene/camera.h"
+#include "scene/model.h"
 
-namespace midgard::core { 
-    struct EngineConfig; 
+namespace midgard::core {
+struct EngineConfig;
 }
 
-namespace midgard::platform { 
-    class Window; 
+namespace midgard::platform {
+class Window;
 }
 
-namespace midgard::bifrost { 
-    class Buffer; 
-    class Texture;
-}
+namespace midgard::bifrost {
+class Buffer;
+class Texture;
+} // namespace midgard::bifrost
 
 namespace midgard::scene {
-    class SceneGraph;
+class SceneGraph;
 }
 
 namespace midgard::render {
@@ -40,6 +41,9 @@ private:
 
     std::shared_ptr<scene::SceneGraph> m_sceneGraph;
     scene::Camera m_camera;
+
+    std::shared_ptr<bifrost::Buffer> m_instanceBuffer;
+    static constexpr size_t MAX_INSTANCES = 10000;
 
     float m_lastFrameTime = 0.0f;
     double m_lastMouseX = 0.0;

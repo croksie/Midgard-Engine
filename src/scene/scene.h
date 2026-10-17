@@ -1,29 +1,24 @@
 #pragma once
+#include <memory>
 #include <unordered_map>
 #include <vector>
-#include <memory>
 
 #include "scene/camera.h"
-
-namespace midgard::math {
-    class Transform;
-}
+#include "scene/scene_node.h"
 
 namespace midgard::renderer {
-    class RenderScene;
+class RenderScene;
 }
 
 namespace midgard::scene {
 
-class SceneNode;
 class Model;
 
 class SceneGraph {
 public:
-
     void setRootNode(std::unique_ptr<SceneNode> node) { m_rootNode = std::move(node); }
 
-    const renderer::RenderScene& generateRenderScene();
+    renderer::RenderScene generateRenderScene();
 
 private:
     std::unique_ptr<SceneNode> m_rootNode;
@@ -31,6 +26,5 @@ private:
 
     std::unordered_map<Model*, std::vector<math::Mat4>> m_groups;
 };
-
 
 } // namespace midgard::scene

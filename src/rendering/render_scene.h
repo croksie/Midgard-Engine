@@ -1,21 +1,15 @@
 #pragma once
 #include <vector>
 
-#include <scene/camera.h>
 #include <rendering/render_packet.h>
-
+#include <scene/camera.h>
 
 namespace midgard::renderer {
 
-class RenderScene {
-public:
-    scene::Camera getCamera() { return m_camera; }
-    void setCamera(scene::Camera camera) { m_camera = camera; }
-private:
+struct RenderScene {
     std::vector<render::SingleDrawPacket> m_singleDraws;
     std::vector<render::InstancedDrawPacket> m_intancedDraws;
     scene::Camera m_camera;
-
 };
 
-} // namepace midgard::renderer
+} // namespace midgard::renderer
