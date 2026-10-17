@@ -76,6 +76,15 @@
             }
         },
         {
+            "name": "windows-msvc-lint",
+            "displayName": "Windows MSVC Debug (Clang-Tidy)",
+            "description": "Build Windows avec MSVC et analyse statique Clang-Tidy active",
+            "inherits": "windows-msvc-debug",
+            "cacheVariables": {
+                "MIDGARD_ENABLE_CLANG_TIDY": "ON"
+            }
+        },
+        {
             "name": "linux-debug",
             "displayName": "Linux Ninja Debug",
             "description": "Build Linux avec Ninja (Debug)",
@@ -124,6 +133,12 @@
             "displayName": "Build Windows MSVC Release",
             "configurePreset": "windows-msvc-release",
             "configuration": "Release"
+        },
+        {
+            "name": "windows-msvc-lint",
+            "displayName": "Build Windows MSVC with Clang-Tidy",
+            "configurePreset": "windows-msvc-lint",
+            "configuration": "Debug"
         },
         {
             "name": "linux-debug",

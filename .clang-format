@@ -1,0 +1,70 @@
+---
+# Midgard-Engine .clang-format configuration
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: Latest
+
+# Indentation et espacement
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+AccessModifierOffset: -4
+
+# Style d'accolades (K&R / Attach)
+BreakBeforeBraces: Attach
+
+# Fonctions et blocs courts
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Alignement des pointeurs et références (ex: Window* window, const Camera& cam)
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Espacement
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+MaxEmptyLinesToKeep: 1
+SpacesInContainerLiterals: true
+
+IndentCaseLabels: true
+
+# Organisation des includes par priorité avec ligne vide entre chaque groupe
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Priorité 1 : Librairie standard C++ (<vector>, <string>, <memory>, <cmath>, etc.)
+  - Regex: '^<[a-z0-9_]+>'
+    Priority: 1
+    SortPriority: 1
+  # Priorité 2 : Dépendances tierces (<glm/..., <vulkan/..., <GLFW/..., <imgui..., stb, etc.)
+  - Regex: '^<.*'
+    Priority: 2
+    SortPriority: 2
+  - Regex: '^"(glm|vulkan|glad|GLFW|imgui|spdlog|assimp|stb|stb_image|vk_bootstrap|dxc)/'
+    Priority: 2
+    SortPriority: 2
+  - Regex: '^"stb_image\.h"'
+    Priority: 2
+    SortPriority: 2
+  # Priorité 3 : "Librairies internes" / modules bas-niveau transverses (math/, utils/)
+  - Regex: '^"(math|utils)/'
+    Priority: 3
+    SortPriority: 3
+  # Priorité 4 : Sous-système graphique / RHI (bifrost/)
+  - Regex: '^"bifrost/'
+    Priority: 4
+    SortPriority: 4
+  # Priorité 5 : Modules haut-niveau du moteur (core/, platform/, scene/, rendering/, resources/)
+  - Regex: '^".*"'
+    Priority: 5
+    SortPriority: 5
+
+# Fin de namespace automatique
+FixNamespaceComments: true

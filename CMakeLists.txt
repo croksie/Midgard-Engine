@@ -125,11 +125,33 @@ target_include_directories(Midgard PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Clang-Tidy static analysis option
+option(MIDGARD_ENABLE_CLANG_TIDY "Enable clang-tidy static analysis during compilation" OFF)
+if(MIDGARD_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+    if(CLANG_TIDY_EXE)
+        message(STATUS "[Midgard] Clang-Tidy enabled: ${CLANG_TIDY_EXE}")
+        set_target_properties(Midgard PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+    else()
+        message(WARNING "[Midgard] Clang-Tidy requested but executable was not found.")
+    endif()
+endif()
+
 # Compiler options
 if(MSVC)
-    target_compile_options(Midgard PRIVATE /W4 /utf-8)
+    target_compile_options(Midgard PRIVATE 
+        /W4 
+        /utf-8
+        /permissive-
+        /external:anglebrackets
+        /external:W0
+    )
 else()
-    target_compile_options(Midgard PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(Midgard PRIVATE 
+        -Wall 
+        -Wextra 
+        -Wpedantic
+    )
 endif()
 
 # Compiler definitions
