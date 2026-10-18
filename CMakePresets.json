@@ -1,168 +1,250 @@
 {
-    "version": 4,
-    "cmakeMinimumRequired": {
-        "major": 4,
-        "minor": 2,
-        "patch": 0
+  "version": 4,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
     },
-    "configurePresets": [
-        {
-            "name": "base",
-            "hidden": true,
-            "binaryDir": "${sourceDir}/build/${presetName}",
-            "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-            }
-        },
-        {
-            "name": "windows-base",
-            "hidden": true,
-            "inherits": "base",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            }
-        },
-        {
-            "name": "linux-base",
-            "hidden": true,
-            "inherits": "base",
-            "generator": "Ninja",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            }
-        },
-        {
-            "name": "macos-base",
-            "hidden": true,
-            "inherits": "base",
-            "generator": "Ninja",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Darwin"
-            }
-        },
-        {
-            "name": "windows-msvc-debug",
-            "displayName": "Windows MSVC Debug",
-            "description": "Build Windows avec MSVC (Debug)",
-            "inherits": "windows-base",
-            "generator": "Visual Studio 18 2026",
-            "architecture": {
-                "value": "x64",
-                "strategy": "set"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "windows-msvc-release",
-            "displayName": "Windows MSVC Release",
-            "description": "Build Windows avec MSVC (Release)",
-            "inherits": "windows-base",
-            "generator": "Visual Studio 18 2026",
-            "architecture": {
-                "value": "x64",
-                "strategy": "set"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "windows-msvc-lint",
-            "displayName": "Windows MSVC Debug (Clang-Tidy)",
-            "description": "Build Windows avec MSVC et analyse statique Clang-Tidy active",
-            "inherits": "windows-msvc-debug",
-            "cacheVariables": {
-                "MIDGARD_ENABLE_CLANG_TIDY": "ON"
-            }
-        },
-        {
-            "name": "linux-debug",
-            "displayName": "Linux Ninja Debug",
-            "description": "Build Linux avec Ninja (Debug)",
-            "inherits": "linux-base",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "linux-release",
-            "displayName": "Linux Ninja Release",
-            "description": "Build Linux avec Ninja (Release)",
-            "inherits": "linux-base",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "macos-debug",
-            "displayName": "macOS Ninja Debug",
-            "description": "Build macOS avec Ninja (Debug)",
-            "inherits": "macos-base",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "macos-release",
-            "displayName": "macOS Ninja Release",
-            "description": "Build macOS avec Ninja (Release)",
-            "inherits": "macos-base",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "windows-msvc-debug",
-            "displayName": "Build Windows MSVC Debug",
-            "configurePreset": "windows-msvc-debug",
-            "configuration": "Debug"
-        },
-        {
-            "name": "windows-msvc-release",
-            "displayName": "Build Windows MSVC Release",
-            "configurePreset": "windows-msvc-release",
-            "configuration": "Release"
-        },
-        {
-            "name": "windows-msvc-lint",
-            "displayName": "Build Windows MSVC with Clang-Tidy",
-            "configurePreset": "windows-msvc-lint",
-            "configuration": "Debug"
-        },
-        {
-            "name": "linux-debug",
-            "displayName": "Build Linux Debug",
-            "configurePreset": "linux-debug",
-            "configuration": "Debug"
-        },
-        {
-            "name": "linux-release",
-            "displayName": "Build Linux Release",
-            "configurePreset": "linux-release",
-            "configuration": "Release"
-        },
-        {
-            "name": "macos-debug",
-            "displayName": "Build macOS Debug",
-            "configurePreset": "macos-debug",
-            "configuration": "Debug"
-        },
-        {
-            "name": "macos-release",
-            "displayName": "Build macOS Release",
-            "configurePreset": "macos-release",
-            "configuration": "Release"
-        }
-    ]
+    {
+      "name": "windows-base",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "toolset": {
+        "value": "host=x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe"
+      }
+    },
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "macos-base",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "windows-ninja-debug",
+      "displayName": "Windows Ninja Debug (Clang / LSP)",
+      "description": "Génération automatique de compile_commands.json via Ninja pour Clang et l'IDE",
+      "inherits": "windows-base",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "windows-ninja-release",
+      "displayName": "Windows Ninja Release",
+      "description": "Build Windows avec Ninja (Release)",
+      "inherits": "windows-base",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "windows-ninja-relwithdebinfo",
+      "displayName": "Windows Ninja RelWithDebInfo",
+      "description": "Build Windows avec Ninja pour profilage (RelWithDebInfo)",
+      "inherits": "windows-base",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-relwithdebinfo",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "windows-msvc",
+      "displayName": "Windows MSVC",
+      "description": "Configuration Visual Studio Multi-Config",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 18 2026",
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "binaryDir": "${sourceDir}/build/windows-msvc"
+    },
+    {
+      "name": "windows-lint",
+      "displayName": "Windows Lint (Clang-Tidy)",
+      "description": "Build Windows avec Ninja et analyse statique Clang-Tidy activée",
+      "inherits": "windows-ninja-debug",
+      "cacheVariables": {
+        "MIDGARD_ENABLE_CLANG_TIDY": "ON"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Ninja Debug",
+      "description": "Build Linux avec Ninja (Debug)",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Ninja Release",
+      "description": "Build Linux avec Ninja (Release)",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "linux-relwithdebinfo",
+      "displayName": "Linux Ninja RelWithDebInfo",
+      "description": "Build Linux avec Ninja pour profilage (RelWithDebInfo)",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "macos-debug",
+      "displayName": "macOS Ninja Debug",
+      "description": "Build macOS avec Ninja (Debug)",
+      "inherits": "macos-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "macos-release",
+      "displayName": "macOS Ninja Release",
+      "description": "Build macOS avec Ninja (Release)",
+      "inherits": "macos-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "macos-relwithdebinfo",
+      "displayName": "macOS Ninja RelWithDebInfo",
+      "description": "Build macOS avec Ninja pour profilage (RelWithDebInfo)",
+      "inherits": "macos-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-ninja-debug",
+      "displayName": "Build Windows Ninja Debug",
+      "configurePreset": "windows-ninja-debug"
+    },
+    {
+      "name": "windows-ninja-release",
+      "displayName": "Build Windows Ninja Release",
+      "configurePreset": "windows-ninja-release"
+    },
+    {
+      "name": "windows-ninja-relwithdebinfo",
+      "displayName": "Build Windows Ninja RelWithDebInfo",
+      "configurePreset": "windows-ninja-relwithdebinfo"
+    },
+    {
+      "name": "windows-msvc-debug",
+      "displayName": "Build Windows MSVC Debug",
+      "configurePreset": "windows-msvc",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-msvc-release",
+      "displayName": "Build Windows MSVC Release",
+      "configurePreset": "windows-msvc",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-msvc-relwithdebinfo",
+      "displayName": "Build Windows MSVC RelWithDebInfo",
+      "configurePreset": "windows-msvc",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "windows-lint",
+      "displayName": "Build Windows Lint (Clang-Tidy)",
+      "configurePreset": "windows-lint"
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Build Linux Debug",
+      "configurePreset": "linux-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Build Linux Release",
+      "configurePreset": "linux-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "linux-relwithdebinfo",
+      "displayName": "Build Linux RelWithDebInfo",
+      "configurePreset": "linux-relwithdebinfo",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "macos-debug",
+      "displayName": "Build macOS Debug",
+      "configurePreset": "macos-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "macos-release",
+      "displayName": "Build macOS Release",
+      "configurePreset": "macos-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "macos-relwithdebinfo",
+      "displayName": "Build macOS RelWithDebInfo",
+      "configurePreset": "macos-relwithdebinfo",
+      "configuration": "RelWithDebInfo"
+    }
+  ]
 }

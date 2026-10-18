@@ -4,6 +4,7 @@
 Checks: >
   -*,
   bugprone-*,
+  -bugprone-exception-escape,
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
   performance-*,
@@ -22,25 +23,25 @@ Checks: >
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-pro-type-member-init
 
-# Filtre pour n'analyser QUE le code source du projet (ignore vcpkg, Vulkan SDK, ImGui, etc.)
-HeaderFilterRegex: 'src/.*'
+# Filtre pour n'analyser QUE le code source du projet (supporte les séparateurs / et \ sous Windows)
+HeaderFilterRegex: '(src[\\/]).*'
 
 # Pas de blocage bloquant la compilation en dev quotidien
 WarningsAsErrors: ''
 
 # Options avancées et convention de nommage du projet
 CheckOptions:
-  # Conventions de nommage (PascalCase classes, camelCase fonctions, m_ membres privés)
+  # Conventions de nommage (PascalCase classes, camelBack fonctions, m_ membres privés)
   readability-identifier-naming.NamespaceCase: lower_case
   readability-identifier-naming.ClassCase: CamelCase
   readability-identifier-naming.StructCase: CamelCase
-  readability-identifier-naming.FunctionCase: camelCase
-  readability-identifier-naming.MethodCase: camelCase
+  readability-identifier-naming.FunctionCase: camelBack
+  readability-identifier-naming.MethodCase: camelBack
   readability-identifier-naming.PrivateMemberPrefix: m_
   readability-identifier-naming.ProtectedMemberPrefix: m_
-  readability-identifier-naming.PublicMemberCase: camelCase
-  readability-identifier-naming.VariableCase: camelCase
-  readability-identifier-naming.ParameterCase: camelCase
+  readability-identifier-naming.PublicMemberCase: camelBack
+  readability-identifier-naming.VariableCase: camelBack
+  readability-identifier-naming.ParameterCase: camelBack
   readability-identifier-naming.ConstantCase: UPPER_CASE
   readability-identifier-naming.EnumCase: CamelCase
   readability-identifier-naming.EnumConstantCase: UPPER_CASE

@@ -8,11 +8,17 @@ Standard: Latest
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
-ColumnLimit: 120
+ColumnLimit: 140
 AccessModifierOffset: -4
 
 # Style d'accolades (K&R / Attach)
 BreakBeforeBraces: Attach
+
+# Améliorations C++20 & Graphique
+LambdaBodyIndentation: Signature
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: true
+PackConstructorInitializers: NextLine
 
 # Fonctions et blocs courts
 AllowShortBlocksOnASingleLine: Never
@@ -40,17 +46,14 @@ SortIncludes: CaseSensitive
 IncludeBlocks: Regroup
 IncludeCategories:
   # Priorité 1 : Librairie standard C++ (<vector>, <string>, <memory>, <cmath>, etc.)
-  - Regex: '^<[a-z0-9_]+>'
+  - Regex: "^<[a-z0-9_]+>"
     Priority: 1
     SortPriority: 1
   # Priorité 2 : Dépendances tierces (<glm/..., <vulkan/..., <GLFW/..., <imgui..., stb, etc.)
-  - Regex: '^<.*'
+  - Regex: "^<.*"
     Priority: 2
     SortPriority: 2
-  - Regex: '^"(glm|vulkan|glad|GLFW|imgui|spdlog|assimp|stb|stb_image|vk_bootstrap|dxc)/'
-    Priority: 2
-    SortPriority: 2
-  - Regex: '^"stb_image\.h"'
+  - Regex: '^"stb_.*\.h"'
     Priority: 2
     SortPriority: 2
   # Priorité 3 : "Librairies internes" / modules bas-niveau transverses (math/, utils/)

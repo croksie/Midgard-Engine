@@ -5,3 +5,11 @@ bin/
 Doxyfile
 Docs/html/
 Docs/latex/
+compile_commands.json
+CMakeUserPresets.json
+vcpkg_installed/
+.cache/
+.clangd/
+imgui.ini
+*.pdb
+*.ilk
