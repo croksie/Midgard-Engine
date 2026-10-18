@@ -6,8 +6,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
 
 #include "math/math.h"
 #include "utils/file_utils.h"
@@ -17,6 +15,7 @@
 #include "bifrost/buffer.h"
 #include "bifrost/opengl/opengl_bifrost.h"
 #include "bifrost/pipeline.h"
+#include "bifrost/pipeline_manager.h"
 #include "bifrost/shader.h"
 #include "bifrost/texture.h"
 #include "bifrost/vulkan/vulkan_bifrost.h"
@@ -29,6 +28,7 @@
 #include "resources/default.h"
 #include "resources/material.h"
 #include "resources/mesh.h"
+#include "resources/model_importer.h"
 #include "scene/scene.h"
 
 namespace midgard::render {
@@ -67,8 +67,13 @@ void Renderer::initialize(platform::Window* window, std::shared_ptr<core::Engine
     // Init SceneGraph
     m_sceneGraph = std::make_shared<midgard::scene::SceneGraph>();
 
-    std::unique_ptr<scene::SceneNode> rootNode = std::make_unique<scene::SceneNode>(
-        utils::importer::importModel(assetFolder + "model/voiture.glb", m_rhi.get()));
+    bifrost::PipelineManager pipelineManager;
+
+    auto rootNode = std::make_unique<scene::SceneNode>();
+    auto modelNode = resource::ModelImporter::loadModel(assetFolder + "model/voiture.glb", m_rhi.get(), pipelineManager);
+    if (modelNode) {
+        rootNode->addChild(modelNode);
+    }
     m_sceneGraph->setRootNode(std::move(rootNode));
 
     ENGINE_LOG_INFO("Renderer initialized");

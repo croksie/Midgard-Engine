@@ -11,7 +11,9 @@ class Model;
 class SceneNode {
 public:
     SceneNode() = default;
-    SceneNode(std::shared_ptr<scene::Model> model) : m_model(model) {}
+    explicit SceneNode(std::shared_ptr<Model> model) {
+        addModel(std::move(model));
+    }
 
     void setPosition(math::Vec3 position) {
         m_transform.position = position;
@@ -21,6 +23,17 @@ public:
         m_transform.rotation = rotation;
         setDirty();
     }
+    void setScale(math::Vec3 scale) {
+        m_transform.scale = scale;
+        setDirty();
+    }
+
+    void setTransform(math::Transform transform) {
+        m_transform = transform;
+        setDirty();
+    }
+
+    void addModel(std::shared_ptr<Model> model) { m_models.emplace_back(std::move(model)); }
 
     void addChild(std::shared_ptr<SceneNode> child) { m_childrens.push_back(child); }
     math::Mat4 getWorldMatrix() const { return m_cachedWorldMatrix; }
@@ -33,14 +46,15 @@ public:
             child->setDirty();
         }
     }
-    void collectTransforms(const math::Mat4& parentMatrix,
-                           std::unordered_map<Model*, std::vector<math::Mat4>>& groups) {
+    void collectTransforms(const math::Mat4& parentMatrix, std::unordered_map<Model*, std::vector<math::Mat4>>& groups) {
         if (m_isDirty) {
             m_cachedWorldMatrix = parentMatrix * m_transform.toMatrix();
             m_isDirty = false;
         }
-        if (m_model) {
-            groups[m_model.get()].push_back(m_cachedWorldMatrix);
+        if (m_models.size() > 0) {
+            for (auto model : m_models) {
+                groups[model.get()].push_back(m_cachedWorldMatrix);
+            }
         }
         for (auto& child : m_childrens) {
             child->collectTransforms(m_cachedWorldMatrix, groups);
@@ -54,7 +68,7 @@ private:
 
     std::shared_ptr<SceneNode> m_parent;
     std::vector<std::shared_ptr<SceneNode>> m_childrens;
-    std::shared_ptr<Model> m_model;
+    std::vector<std::shared_ptr<Model>> m_models;
 };
 
 } // namespace midgard::scene

@@ -7,7 +7,7 @@
 #include "scene/scene_node.h"
 
 namespace midgard::renderer {
-class RenderScene;
+struct RenderScene;
 }
 
 namespace midgard::scene {
