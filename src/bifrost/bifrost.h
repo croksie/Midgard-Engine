@@ -60,15 +60,13 @@ public:
      * @note This function should be called at the start of each frame.
      */
     virtual void beginFrame() = 0;
-    *
 
-        /**
-         * @brief Ends the current frame.
-         * @note This function should be called at the end of each frame.
-         */
+    /**
+     * @brief Ends the current frame.
+     * @note This function should be called at the end of each frame.
+     */
 
-        virtual void
-        endFrame() = 0;
+    virtual void endFrame() = 0;
     /**
      * @brief Clears the screen.
      */
