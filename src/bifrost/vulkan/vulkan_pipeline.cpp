@@ -16,8 +16,7 @@ VulkanPipeline::VulkanPipeline(const PipelineInfo& info, VulkanContext& ctx, VkP
     auto vertShader = std::static_pointer_cast<VulkanShader>(info.vertexShader);
     auto fragShader = std::static_pointer_cast<VulkanShader>(info.fragmentShader);
 
-    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShader->getStageCreateInfo(),
-                                                      fragShader->getStageCreateInfo()};
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShader->getStageCreateInfo(), fragShader->getStageCreateInfo()};
 
     // VertexDescription
     std::vector<VkVertexInputBindingDescription> bindingDescs;
@@ -141,8 +140,7 @@ void VulkanPipeline::bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) {
 
     vkCmdBindPipeline(m_ctx->cmdBuffers[m_ctx->currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 0, 1, vulkanVertexBuffer->getBufferHandle(),
-                           offsets);
+    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 0, 1, vulkanVertexBuffer->getBufferHandle(), offsets);
 
     m_numberOfVerticesInBindedObject = static_cast<uint32_t>(vulkanVertexBuffer->getSize() / sizeof(Vertex));
 }
@@ -154,27 +152,13 @@ void VulkanPipeline::bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer, 
     }
     VulkanBuffer* vulkanInstanceBuffer = static_cast<VulkanBuffer*>(instanceBuffer.get());
     VkDeviceSize offsets[] = {offset};
-    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 1, 1, vulkanInstanceBuffer->getBufferHandle(),
-                           offsets);
+    vkCmdBindVertexBuffers(m_ctx->cmdBuffers[m_ctx->currentFrame], 1, 1, vulkanInstanceBuffer->getBufferHandle(), offsets);
 }
 
 void VulkanPipeline::bindIndexBuffer(std::shared_ptr<Buffer> indexBuffer) {
     VulkanBuffer* vulkanIndexBuffer = static_cast<VulkanBuffer*>(indexBuffer.get());
-    vkCmdBindIndexBuffer(m_ctx->cmdBuffers[m_ctx->currentFrame], *vulkanIndexBuffer->getBufferHandle(), 0,
-                         VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(m_ctx->cmdBuffers[m_ctx->currentFrame], *vulkanIndexBuffer->getBufferHandle(), 0, VK_INDEX_TYPE_UINT32);
     m_numberOfIndicesInBindedObject = static_cast<uint32_t>(vulkanIndexBuffer->getSize() / sizeof(uint32_t));
-}
-
-void VulkanPipeline::bindTexture(std::shared_ptr<Texture> texture, uint32_t slot) {
-    ENGINE_LOG_TRACE("Binding texture...");
-    if (!texture)
-        return;
-    VulkanTexture* vulkanTex = static_cast<VulkanTexture*>(texture.get());
-    VkDescriptorSet texSet = vulkanTex->getDescriptorSet();
-    if (texSet != VK_NULL_HANDLE) {
-        vkCmdBindDescriptorSets(m_ctx->cmdBuffers[m_ctx->currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                m_pipelineLayout, 1, 1, &texSet, 0, nullptr);
-    }
 }
 
 } // namespace midgard::bifrost::vulkan

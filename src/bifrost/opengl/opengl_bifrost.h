@@ -23,7 +23,7 @@ public:
     ~OpenGLBifrost() override = default;
 
     void initialize(platform::Window* window, std::shared_ptr<core::EngineConfig> config) override;
-    void shutdown() override {}
+    void shutdown() override;
 
     void beginFrame() override;
     void endFrame() override;
@@ -35,13 +35,13 @@ public:
     std::shared_ptr<Pipeline> createPipeline(const PipelineInfo& info) override;
     std::shared_ptr<Buffer> createBuffer(const BufferDesc& desc) override;
     std::shared_ptr<Texture> createTexture(const TextureDesc& desc) override;
+    std::shared_ptr<BindGroup> createBindGroup(const BindGroupDesc& desc) override;
 
     void bindVertexBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer) override;
-    void bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer,
-                            uint32_t offset) override;
+    void bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer, uint32_t offset) override;
     void bindIndexBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer) override;
-    void bindTexture(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Texture> texture, uint32_t slot = 0) override;
     void bindPipeline(Pipeline* pipeline) override;
+    void bindGroup(uint32_t setIndex, std::shared_ptr<BindGroup> bindGroup) override;
 
     void setGlobalUniform(const void* data, size_t size) override;
     void setLocalUniform(const void* data, size_t size) override;
@@ -50,7 +50,8 @@ private:
     platform::Window* m_window = nullptr;
     std::shared_ptr<core::EngineConfig> m_config;
 
-    std::unique_ptr<OpenGLBuffer> m_uniformBuffer;
+    std::unique_ptr<OpenGLBuffer> m_uniformBuffer;         // Binding 0
+    std::unique_ptr<OpenGLBuffer> m_materialUniformBuffer; // Binding 1
 
     void onWindowResize(int width, int height);
 };

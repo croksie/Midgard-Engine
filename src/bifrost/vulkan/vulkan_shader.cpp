@@ -11,20 +11,33 @@ namespace midgard::bifrost::vulkan {
 VulkanShader::VulkanShader(VkDevice device, ShaderType type, const std::vector<uint32_t>& spirvCode, const std::string &entryPoint)
     : m_device(device), m_type(type), m_entryPoint(entryPoint)
 {
+    if (spirvCode.empty()) {
+        ENGINE_LOG_ERROR("Cannot create Vulkan shader module: SPIR-V code is empty!");
+        m_module = VK_NULL_HANDLE;
+        return;
+    }
+
     ENGINE_LOG_TRACE("Creating shader...");
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = spirvCode.size() * sizeof(uint32_t);
     createInfo.pCode = spirvCode.data();
 
-    vkCreateShaderModule(m_device, &createInfo, nullptr, &m_module);
+    VkResult result = vkCreateShaderModule(m_device, &createInfo, nullptr, &m_module);
+    if (result != VK_SUCCESS) {
+        ENGINE_LOG_CRITICAL("Failed to create shader module. Vulkan error Code : {}", static_cast<int>(result));
+    }
 }
 
 VulkanShader::VulkanShader(VkDevice device, ShaderType type, const std::string &source, const std::string &entryPoint)
     : m_device(device), m_type(type), m_entryPoint(entryPoint)
 {
-    std::vector<uint32_t> spirvCode;
-    spirvCode = compileGLSLToSPIRV(source, type, entryPoint);
+    std::vector<uint32_t> spirvCode = compileGLSLToSPIRV(source, type, entryPoint);
+    if (spirvCode.empty()) {
+        ENGINE_LOG_ERROR("Cannot create Vulkan shader module: SPIR-V code is empty!");
+        m_module = VK_NULL_HANDLE;
+        return;
+    }
 
     ENGINE_LOG_TRACE("Creating shader...");
     VkShaderModuleCreateInfo createInfo{};

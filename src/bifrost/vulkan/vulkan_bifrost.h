@@ -29,6 +29,7 @@ public:
 
     void initialize(platform::Window* window, std::shared_ptr<core::EngineConfig> config) override;
     void shutdown() override;
+    void waitIdle() override;
 
     void beginFrame() override;
     void endFrame() override;
@@ -40,13 +41,13 @@ public:
     std::shared_ptr<Buffer> createBuffer(const BufferDesc& desc) override;
     std::shared_ptr<Pipeline> createPipeline(const PipelineInfo& info) override;
     std::shared_ptr<Texture> createTexture(const TextureDesc& desc) override;
+    std::shared_ptr<BindGroup> createBindGroup(const BindGroupDesc& desc) override;
 
     void bindPipeline(Pipeline* pipeline) override;
     void bindVertexBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer) override;
-    void bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer,
-                            uint32_t offset) override;
+    void bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer, uint32_t offset) override;
     void bindIndexBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer) override;
-    void bindTexture(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Texture> texture, uint32_t slot = 0) override;
+    void bindGroup(uint32_t setIndex, std::shared_ptr<BindGroup> bindGroup) override;
 
     void setGlobalUniform(const void* data, size_t size) override;
     void setLocalUniform(const void* data, size_t size) override;
@@ -61,6 +62,7 @@ private:
     VulkanPipeline* m_currentPipeline = nullptr;
 
     void onWindowResize(int width, int height);
+    void recreateSwapchain();
     bool m_framebufferResized = false;
     uint32_t m_width = 0;
     uint32_t m_height = 0;

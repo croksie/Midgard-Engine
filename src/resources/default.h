@@ -15,10 +15,13 @@ public:
     static void shutdown();
 
     static std::shared_ptr<bifrost::Texture> getDefaultTexture() { return s_defaultTexture; }
+    static std::shared_ptr<bifrost::Texture> getDefaultNormalTexture() { return s_defaultNormalTexture ? s_defaultNormalTexture : s_defaultTexture; }
+    static std::shared_ptr<bifrost::Texture> getDefaultBlackTexture() { return s_defaultBlackTexture ? s_defaultBlackTexture : s_defaultTexture; }
 
 private:
-    inline  static std::shared_ptr<bifrost::Texture> s_defaultTexture = nullptr;
-
+    inline static std::shared_ptr<bifrost::Texture> s_defaultTexture = nullptr;
+    inline static std::shared_ptr<bifrost::Texture> s_defaultNormalTexture = nullptr;
+    inline static std::shared_ptr<bifrost::Texture> s_defaultBlackTexture = nullptr;
 };
 
 } // namespace midgard::resource

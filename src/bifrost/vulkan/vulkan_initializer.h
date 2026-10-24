@@ -1,29 +1,29 @@
 #pragma once
-#include <vector>
 #include <memory>
+#include <vector>
 
-#include <VkBootstrap.h>
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <VkBootstrap.h>
 #include <vulkan/vulkan.h>
-
-#include "core/config.h"
 
 #include "bifrost/vulkan/vulkan_buffer.h"
 
+#include "core/config.h"
+
 namespace midgard::platform {
-    class Window;
+class Window;
 }
 
 namespace midgard::bifrost::vulkan {
 
 struct FrameSyncObjects {
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE; // When swapChain gives image
-    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE; // When GPU finishes render
     VkFence inFlightFence = VK_NULL_HANDLE;
 };
 
 struct VulkanContext {
-    VulkanContext(uint32_t maxFramesInFlight = 3) 
+    VulkanContext(uint32_t maxFramesInFlight = 3)
         : maxFramesInFlight(maxFramesInFlight),
           syncObjects(maxFramesInFlight),
           cmdBuffers(maxFramesInFlight),
@@ -46,6 +46,7 @@ struct VulkanContext {
     // Swapchain
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
+    VkExtent2D swapchainExtent = {0, 0};
     std::vector<VkImage> swapchainImages;
     std::vector<VkImageView> swapchainImageViews;
 
@@ -57,11 +58,12 @@ struct VulkanContext {
 
     // Fences / Semaphores
     std::vector<FrameSyncObjects> syncObjects;
+    std::vector<VkSemaphore> renderFinishedSemaphores; // Dimensioned to swapchainImages.size()
 
     // CommandPool / CommandBuffer
     VkCommandPool cmdPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> cmdBuffers;
-    
+
     // Uniform Buffers
     std::vector<std::unique_ptr<VulkanBuffer>> uniformBuffers;
 
@@ -79,7 +81,8 @@ struct VulkanContext {
 
 // Initialize
 VulkanContext createContext(platform::Window* window, std::shared_ptr<core::EngineConfig> config);
-void createSwapchain(VulkanContext& ctx, uint32_t width, uint32_t height, bool vsync);
+void createSwapchain(VulkanContext& ctx, uint32_t& width, uint32_t& height, bool vsync);
+void createRenderFinishedSemaphores(VulkanContext& ctx);
 void createDepthBuffer(VulkanContext& ctx, uint32_t width, uint32_t height);
 void createFenceAndSemaphore(VulkanContext& ctx);
 void createCommandPool(VulkanContext& ctx);
@@ -99,8 +102,7 @@ uint32_t findMemoryType(const VulkanContext& ctx, uint32_t typeFilter, VkMemoryP
 VkCommandBuffer beginSingleTimeCommands(const VulkanContext& ctx);
 void endSingleTimeCommands(const VulkanContext& ctx, VkCommandBuffer commandBuffer);
 void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
-                           VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
-                           VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess,
-                           VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT);
+                           VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess, VkPipelineStageFlags2 dstStage,
+                           VkAccessFlags2 dstAccess, VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT);
 
 } // namespace midgard::bifrost::vulkan

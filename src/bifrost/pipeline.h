@@ -20,7 +20,6 @@ public:
     virtual void bindVertexBuffer(std::shared_ptr<Buffer> vertexBuffer) = 0;
     virtual void bindInstanceBuffer(std::shared_ptr<Buffer> instanceBuffer, uint32_t offset) = 0;
     virtual void bindIndexBuffer(std::shared_ptr<Buffer> indexBuffer) = 0;
-    virtual void bindTexture(std::shared_ptr<Texture> texture, uint32_t slot = 0) = 0;
 };
 
 } // namespace midgard::bifrost

@@ -4,6 +4,7 @@
 
 #include "utils/log.h"
 
+#include "bifrost/vulkan/vulkan_bind_group.h"
 #include "bifrost/vulkan/vulkan_buffer.h"
 #include "bifrost/vulkan/vulkan_pipeline.h"
 #include "bifrost/vulkan/vulkan_shader.h"
@@ -60,10 +61,22 @@ void VulkanBifrost::shutdown() {
     vkDeviceWaitIdle(m_ctx.device);
     m_ctx.uniformBuffers.clear();
     for (auto& sync : m_ctx.syncObjects) {
-        vkDestroySemaphore(m_ctx.device, sync.imageAvailableSemaphore, nullptr);
-        vkDestroySemaphore(m_ctx.device, sync.renderFinishedSemaphore, nullptr);
-        vkDestroyFence(m_ctx.device, sync.inFlightFence, nullptr);
+        if (sync.imageAvailableSemaphore != VK_NULL_HANDLE) {
+            vkDestroySemaphore(m_ctx.device, sync.imageAvailableSemaphore, nullptr);
+            sync.imageAvailableSemaphore = VK_NULL_HANDLE;
+        }
+        if (sync.inFlightFence != VK_NULL_HANDLE) {
+            vkDestroyFence(m_ctx.device, sync.inFlightFence, nullptr);
+            sync.inFlightFence = VK_NULL_HANDLE;
+        }
     }
+    for (auto sem : m_ctx.renderFinishedSemaphores) {
+        if (sem != VK_NULL_HANDLE) {
+            vkDestroySemaphore(m_ctx.device, sem, nullptr);
+        }
+    }
+    m_ctx.renderFinishedSemaphores.clear();
+
     vkDestroyPipelineLayout(m_ctx.device, m_ctx.pipelineLayout, nullptr);
     vkDestroyDescriptorPool(m_ctx.device, m_ctx.descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(m_ctx.device, m_ctx.globalDescriptorSetLayout, nullptr);
@@ -72,7 +85,11 @@ void VulkanBifrost::shutdown() {
     for (auto view : m_ctx.swapchainImageViews) {
         vkDestroyImageView(m_ctx.device, view, nullptr);
     }
-    vkDestroySwapchainKHR(m_ctx.device, m_ctx.swapchain, nullptr);
+    m_ctx.swapchainImageViews.clear();
+    if (m_ctx.swapchain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(m_ctx.device, m_ctx.swapchain, nullptr);
+        m_ctx.swapchain = VK_NULL_HANDLE;
+    }
     for (size_t i = 0; i < m_ctx.depthImageViews.size(); i++) {
         if (m_ctx.depthImageViews[i] != VK_NULL_HANDLE) {
             vkDestroyImageView(m_ctx.device, m_ctx.depthImageViews[i], nullptr);
@@ -93,28 +110,64 @@ void VulkanBifrost::shutdown() {
     vkDestroyInstance(m_ctx.instance, nullptr);
 }
 
+void VulkanBifrost::waitIdle() {
+    if (m_ctx.device != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(m_ctx.device);
+    }
+}
+
+void VulkanBifrost::recreateSwapchain() {
+    int width = 0, height = 0;
+    GLFWwindow* window = static_cast<GLFWwindow*>(m_window->getNativeHandle());
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(m_ctx.device);
+
+    cleanupSwapchain(m_ctx);
+    cleanupDepthBuffer(m_ctx);
+
+    m_width = static_cast<uint32_t>(width);
+    m_height = static_cast<uint32_t>(height);
+    createSwapchain(m_ctx, m_width, m_height, m_config->vsync);
+    m_config->windowWidth = m_width;
+    m_config->windowHeight = m_height;
+    createDepthBuffer(m_ctx, m_width, m_height);
+    m_framebufferResized = false;
+}
+
 void VulkanBifrost::beginFrame() {
     ENGINE_LOG_TRACE("Begin of frame");
 
-    if (m_framebufferResized) {
-        ENGINE_LOG_DEBUG("Window resized");
+    while (true) {
+        if (m_framebufferResized) {
+            ENGINE_LOG_DEBUG("Window resized");
+            recreateSwapchain();
+        }
 
-        cleanupSwapchain(m_ctx);
-        cleanupDepthBuffer(m_ctx);
+        auto& sync = m_ctx.syncObjects[m_ctx.currentFrame];
 
-        createSwapchain(m_ctx, m_width, m_height, m_config->vsync);
-        createDepthBuffer(m_ctx, m_width, m_height);
-        m_framebufferResized = false;
+        // Wait for GPU
+        vkWaitForFences(m_ctx.device, 1, &sync.inFlightFence, VK_TRUE, UINT64_MAX);
+
+        // Get image from swapchain
+        VkResult acquireResult = vkAcquireNextImageKHR(m_ctx.device, m_ctx.swapchain, UINT64_MAX,
+                                                      sync.imageAvailableSemaphore, VK_NULL_HANDLE, &m_imageIndex);
+
+        if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
+            recreateSwapchain();
+            continue;
+        } else if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) {
+            ENGINE_LOG_CRITICAL("Failed to acquire swapchain image: error {}", static_cast<int>(acquireResult));
+        }
+
+        // Reset fence only after confirmed acquire
+        vkResetFences(m_ctx.device, 1, &sync.inFlightFence);
+        break;
     }
-
-    auto& sync = m_ctx.syncObjects[m_ctx.currentFrame];
-    // Wait for GPU
-    vkWaitForFences(m_ctx.device, 1, &sync.inFlightFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(m_ctx.device, 1, &sync.inFlightFence);
-
-    // Get image from swapchain
-    vkAcquireNextImageKHR(m_ctx.device, m_ctx.swapchain, UINT64_MAX, sync.imageAvailableSemaphore, VK_NULL_HANDLE,
-                          &m_imageIndex);
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -123,17 +176,30 @@ void VulkanBifrost::beginFrame() {
         ENGINE_LOG_CRITICAL("Failed to begin recording command buffer!");
     }
 
-    transitionImageLayout(m_ctx.cmdBuffers[m_ctx.currentFrame], m_ctx.swapchainImages[m_imageIndex],
-                          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+    transitionImageLayout(m_ctx.cmdBuffers[m_ctx.currentFrame],
+                          m_ctx.swapchainImages[m_imageIndex],
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          0,
+                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                           VK_IMAGE_ASPECT_COLOR_BIT);
 
-    transitionImageLayout(m_ctx.cmdBuffers[m_ctx.currentFrame], m_ctx.depthImages[m_ctx.currentFrame],
-                          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                          VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, 0,
+    VkImageAspectFlags depthAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (m_ctx.depthFormat == VK_FORMAT_D32_SFLOAT_S8_UINT || m_ctx.depthFormat == VK_FORMAT_D24_UNORM_S8_UINT) {
+        depthAspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+
+    transitionImageLayout(m_ctx.cmdBuffers[m_ctx.currentFrame],
+                          m_ctx.depthImages[m_ctx.currentFrame],
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
                           VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                          VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+                          0,
+                          VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                          VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                          depthAspectMask);
 
     VkRenderingAttachmentInfo colorAttachment{};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -180,10 +246,14 @@ void VulkanBifrost::beginFrame() {
 void VulkanBifrost::endFrame() {
     vkCmdEndRendering(m_ctx.cmdBuffers[m_ctx.currentFrame]);
 
-    transitionImageLayout(m_ctx.cmdBuffers[m_ctx.currentFrame], m_ctx.swapchainImages[m_imageIndex],
-                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                          VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0);
+    transitionImageLayout(m_ctx.cmdBuffers[m_ctx.currentFrame],
+                          m_ctx.swapchainImages[m_imageIndex],
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                          VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                          VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+                          0);
     vkEndCommandBuffer(m_ctx.cmdBuffers[m_ctx.currentFrame]);
 
     auto& sync = m_ctx.syncObjects[m_ctx.currentFrame];
@@ -201,11 +271,13 @@ void VulkanBifrost::endFrame() {
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &m_ctx.cmdBuffers[m_ctx.currentFrame];
 
-    VkSemaphore signalSemaphores[] = {sync.renderFinishedSemaphore};
+    VkSemaphore signalSemaphores[] = {m_ctx.renderFinishedSemaphores[m_imageIndex]};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    vkQueueSubmit(m_ctx.graphicsQueue, 1, &submitInfo, sync.inFlightFence);
+    if (vkQueueSubmit(m_ctx.graphicsQueue, 1, &submitInfo, sync.inFlightFence) != VK_SUCCESS) {
+        ENGINE_LOG_CRITICAL("Failed to submit draw command buffer!");
+    }
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -215,7 +287,13 @@ void VulkanBifrost::endFrame() {
     presentInfo.pSwapchains = &m_ctx.swapchain;
     presentInfo.pImageIndices = &m_imageIndex;
 
-    vkQueuePresentKHR(m_ctx.presentQueue, &presentInfo);
+    VkResult presentResult = vkQueuePresentKHR(m_ctx.presentQueue, &presentInfo);
+    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || m_framebufferResized) {
+        m_framebufferResized = false;
+        recreateSwapchain();
+    } else if (presentResult != VK_SUCCESS) {
+        ENGINE_LOG_CRITICAL("Failed to present swapchain image: error {}", static_cast<int>(presentResult));
+    }
 
     m_ctx.currentFrame = (m_ctx.currentFrame + 1) % m_ctx.maxFramesInFlight;
     glfwPollEvents();
@@ -240,8 +318,7 @@ void VulkanBifrost::bindVertexBuffer(std::shared_ptr<Pipeline> pipeline, std::sh
     vulkanPipeline->bindVertexBuffer(buffer);
 }
 
-void VulkanBifrost::bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer,
-                                       uint32_t offset) {
+void VulkanBifrost::bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer, uint32_t offset) {
     ENGINE_LOG_TRACE("Binding instance buffer...");
     VulkanPipeline* vulkanPipeline = static_cast<VulkanPipeline*>(pipeline.get());
     vulkanPipeline->bindInstanceBuffer(buffer, offset);
@@ -258,12 +335,27 @@ std::shared_ptr<Texture> VulkanBifrost::createTexture(const TextureDesc& desc) {
     return std::make_shared<VulkanTexture>(desc, m_ctx);
 }
 
-void VulkanBifrost::bindTexture(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Texture> texture, uint32_t slot) {
-    ENGINE_LOG_TRACE("Binding texture...");
-    if (!pipeline || !texture)
+std::shared_ptr<BindGroup> VulkanBifrost::createBindGroup(const BindGroupDesc& desc) {
+    ENGINE_LOG_TRACE("Creating bind group...");
+    return std::make_shared<VulkanBindGroup>(desc, m_ctx);
+}
+
+void VulkanBifrost::bindGroup(uint32_t setIndex, std::shared_ptr<BindGroup> bindGroup) {
+    if (!bindGroup) {
         return;
-    VulkanPipeline* vulkanPipeline = static_cast<VulkanPipeline*>(pipeline.get());
-    vulkanPipeline->bindTexture(texture, slot);
+    }
+    auto vulkanBindGroup = std::static_pointer_cast<VulkanBindGroup>(bindGroup);
+    VkDescriptorSet descriptorSet = vulkanBindGroup->getDescriptorSet();
+    if (descriptorSet != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(m_ctx.cmdBuffers[m_ctx.currentFrame],
+                                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                m_ctx.pipelineLayout,
+                                setIndex,
+                                1,
+                                &descriptorSet,
+                                0,
+                                nullptr);
+    }
 }
 
 std::shared_ptr<Pipeline> VulkanBifrost::createPipeline(const PipelineInfo& info) {
@@ -275,8 +367,15 @@ void VulkanBifrost::bindPipeline(Pipeline* pipeline) {
     ENGINE_LOG_TRACE("Binding pipeline...");
     VulkanPipeline* vulkanPipeline = static_cast<VulkanPipeline*>(pipeline);
     m_currentPipeline = vulkanPipeline;
-    vkCmdBindPipeline(m_ctx.cmdBuffers[m_ctx.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      vulkanPipeline->getPipeline());
+    vkCmdBindPipeline(m_ctx.cmdBuffers[m_ctx.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getPipeline());
+    vkCmdBindDescriptorSets(m_ctx.cmdBuffers[m_ctx.currentFrame],
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_ctx.pipelineLayout,
+                            0,
+                            1,
+                            &m_ctx.descriptorSets[m_ctx.currentFrame],
+                            0,
+                            nullptr);
 }
 
 std::shared_ptr<Shader> VulkanBifrost::createShader(ShaderType type, const std::string& source, bool isInstanced) {
@@ -295,13 +394,19 @@ std::shared_ptr<Shader> VulkanBifrost::createShader(ShaderType type, const std::
 
 void VulkanBifrost::setGlobalUniform(const void* data, size_t size) {
     m_ctx.uniformBuffers[m_ctx.currentFrame]->setData(size, data, 0);
-    vkCmdBindDescriptorSets(m_ctx.cmdBuffers[m_ctx.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, m_ctx.pipelineLayout,
-                            0, 1, &m_ctx.descriptorSets[m_ctx.currentFrame], 0, nullptr);
+    vkCmdBindDescriptorSets(m_ctx.cmdBuffers[m_ctx.currentFrame],
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_ctx.pipelineLayout,
+                            0,
+                            1,
+                            &m_ctx.descriptorSets[m_ctx.currentFrame],
+                            0,
+                            nullptr);
 }
 
 void VulkanBifrost::setLocalUniform(const void* data, size_t size) {
-    vkCmdPushConstants(m_ctx.cmdBuffers[m_ctx.currentFrame], m_ctx.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                       static_cast<uint32_t>(size), data);
+    vkCmdPushConstants(
+        m_ctx.cmdBuffers[m_ctx.currentFrame], m_ctx.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, static_cast<uint32_t>(size), data);
 }
 
 } // namespace midgard::bifrost::vulkan

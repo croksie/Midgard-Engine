@@ -8,62 +8,69 @@
 
 #include "platform/window/window.h"
 
-
-
 namespace midgard::bifrost::vulkan {
 
-VulkanContext createContext(platform::Window *window, std::shared_ptr<core::EngineConfig> config) {
+VulkanContext createContext(platform::Window* window, std::shared_ptr<core::EngineConfig> config) {
     window->initializeWindow(config->windowWidth, config->windowHeight, config->windowTitle.c_str());
 
     VulkanContext ctx(config->maxFramesInFlight);
 
     ENGINE_LOG_TRACE("Creating instance...");
+    uint32_t glfwExtCount = 0;
+    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtCount);
+
     // Use vkbootstrap to initialize Vulkan
     vkb::InstanceBuilder instBuilder;
-    auto instResult = instBuilder
-        .set_app_name("Midgard")
-        #ifdef DEBUG
-            .request_validation_layers(true) 
-            .use_default_debug_messenger()
-        #endif
-        .require_api_version(1, 3, 0) // Force Vulkan 1.3 in order to use Dynamic Rendering
-        .build();
+    instBuilder.set_app_name("Midgard")
+#ifndef NDEBUG
+               .request_validation_layers(true)
+               .use_default_debug_messenger()
+#endif
+               .require_api_version(1, 3, 0); // Force Vulkan 1.3 in order to use Dynamic Rendering
+
+    if (glfwExtensions != nullptr && glfwExtCount > 0) {
+        instBuilder.enable_extensions(glfwExtCount, glfwExtensions);
+    }
+
+    auto instResult = instBuilder.build();
 
     if (!instResult) {
-        ENGINE_LOG_CRITICAL("Failed to create instance : {}",instResult.error().message());
+        ENGINE_LOG_CRITICAL("Failed to create instance : {}", instResult.error().message());
     }
     vkb::Instance vkbInst = instResult.value();
     ctx.instance = vkbInst.instance;
     ctx.debugMessenger = vkbInst.debug_messenger;
 
     // Create surface
-    glfwCreateWindowSurface(ctx.instance, static_cast<GLFWwindow*>(window->getNativeHandle()), nullptr, &ctx.surface);
+    VkResult surfResult = glfwCreateWindowSurface(ctx.instance, static_cast<GLFWwindow*>(window->getNativeHandle()), nullptr, &ctx.surface);
+    if (surfResult != VK_SUCCESS) {
+        ENGINE_LOG_CRITICAL("Failed to create window surface : VkResult = {}", static_cast<int>(surfResult));
+    }
 
     // Use Vulkan 1.3 features (dynamicRendering, etc)
     VkPhysicalDeviceVulkan13Features features13{};
     features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-    features13.dynamicRendering = VK_TRUE;    // Suppress RenderPass / Framebuffers
-    features13.synchronization2 = VK_TRUE;    // Simplified Sync
+    features13.dynamicRendering = VK_TRUE; // Suppress RenderPass / Framebuffers
+    features13.synchronization2 = VK_TRUE; // Simplified Sync
 
     ENGINE_LOG_TRACE("Choosing physical device...");
     // Select Physical Device
-    vkb::PhysicalDeviceSelector selector{ vkbInst };
-    auto physResult = selector
-        .set_surface(ctx.surface)
-        .set_minimum_version(1, 3)
-        .set_required_features_13(features13)
-        .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
-        .select();
+    vkb::PhysicalDeviceSelector selector{vkbInst};
+    auto physResult = selector.set_surface(ctx.surface)
+                          .set_minimum_version(1, 3)
+                          .set_required_features_13(features13)
+                          .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
+                          .select();
 
     if (!physResult) {
-        ENGINE_LOG_CRITICAL("Failed to choose physical device : {}",physResult.error().message());
+        ENGINE_LOG_CRITICAL("Failed to choose physical device : {}", physResult.error().message());
     }
     vkb::PhysicalDevice vkbPhysDevice = physResult.value();
     ctx.physicalDevice = vkbPhysDevice.physical_device;
 
     ENGINE_LOG_TRACE("Creating logical device and queue...");
     // Create logical device and queue
-    vkb::DeviceBuilder devBuilder{ vkbPhysDevice };
+    vkb::DeviceBuilder devBuilder{vkbPhysDevice};
     auto devResult = devBuilder.build();
     if (!devResult) {
         ENGINE_LOG_CRITICAL("Failed to create logical device : {}", devResult.error().message());
@@ -79,33 +86,45 @@ VulkanContext createContext(platform::Window *window, std::shared_ptr<core::Engi
 }
 
 // Swapchain
-void createSwapchain(VulkanContext &ctx, uint32_t width, uint32_t height, bool vsync) {
+void createSwapchain(VulkanContext& ctx, uint32_t& width, uint32_t& height, bool vsync) {
     ENGINE_LOG_TRACE("Creating swapchain...");
-    vkb::SwapchainBuilder scBuilder{ ctx.physicalDevice, ctx.device, ctx.surface };
-    auto scResult = scBuilder
-        .set_desired_extent(width, height)
-        .set_desired_present_mode(vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR)
-        .build();
+    vkb::SwapchainBuilder scBuilder{ctx.physicalDevice, ctx.device, ctx.surface};
+    auto scResult = scBuilder.set_desired_extent(width, height)
+                        .set_desired_present_mode(vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR)
+                        .build();
 
     if (!scResult) {
         ENGINE_LOG_CRITICAL("Failed to create swapchain : {}", scResult.error().message());
     }
     vkb::Swapchain vkbSwapchain = scResult.value();
-    
+
     ctx.swapchain = vkbSwapchain.swapchain;
     ctx.swapchainFormat = vkbSwapchain.image_format;
+    ctx.swapchainExtent = vkbSwapchain.extent;
+    width = vkbSwapchain.extent.width;
+    height = vkbSwapchain.extent.height;
     ctx.swapchainImages = vkbSwapchain.get_images().value();
     ctx.swapchainImageViews = vkbSwapchain.get_image_views().value();
+
+    createRenderFinishedSemaphores(ctx);
+}
+
+void createRenderFinishedSemaphores(VulkanContext& ctx) {
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    ctx.renderFinishedSemaphores.resize(ctx.swapchainImages.size());
+    for (size_t i = 0; i < ctx.swapchainImages.size(); ++i) {
+        if (vkCreateSemaphore(ctx.device, &semaphoreInfo, nullptr, &ctx.renderFinishedSemaphores[i]) != VK_SUCCESS) {
+            ENGINE_LOG_CRITICAL("Failed to create render finished semaphore!");
+        }
+    }
 }
 
 // Depth Buffer
-void createDepthBuffer(VulkanContext &ctx, uint32_t width, uint32_t height) {
+void createDepthBuffer(VulkanContext& ctx, uint32_t width, uint32_t height) {
     ENGINE_LOG_TRACE("Checking depth format...");
-    std::vector<VkFormat> candidates = {
-        VK_FORMAT_D32_SFLOAT,
-        VK_FORMAT_D32_SFLOAT_S8_UINT,
-        VK_FORMAT_D24_UNORM_S8_UINT
-    };
+    std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
 
     for (VkFormat format : candidates) {
         VkFormatProperties props;
@@ -176,7 +195,7 @@ void createDepthBuffer(VulkanContext &ctx, uint32_t width, uint32_t height) {
     }
 }
 
-void createFenceAndSemaphore(VulkanContext &ctx) {
+void createFenceAndSemaphore(VulkanContext& ctx) {
     ENGINE_LOG_TRACE("Creating fence and semaphore...");
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -187,12 +206,11 @@ void createFenceAndSemaphore(VulkanContext &ctx) {
 
     for (size_t i = 0; i < ctx.maxFramesInFlight; i++) {
         vkCreateSemaphore(ctx.device, &semaphoreInfo, nullptr, &ctx.syncObjects[i].imageAvailableSemaphore);
-        vkCreateSemaphore(ctx.device, &semaphoreInfo, nullptr, &ctx.syncObjects[i].renderFinishedSemaphore);
         vkCreateFence(ctx.device, &fenceInfo, nullptr, &ctx.syncObjects[i].inFlightFence);
     }
 }
 
-void createCommandPool(VulkanContext &ctx) {
+void createCommandPool(VulkanContext& ctx) {
     ENGINE_LOG_TRACE("Creating command pool...");
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -202,19 +220,19 @@ void createCommandPool(VulkanContext &ctx) {
     vkCreateCommandPool(ctx.device, &poolInfo, nullptr, &ctx.cmdPool);
 }
 
-void createCommandBuffer(VulkanContext &ctx) {
+void createCommandBuffer(VulkanContext& ctx) {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = ctx.cmdPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = ctx.maxFramesInFlight; 
+    allocInfo.commandBufferCount = ctx.maxFramesInFlight;
 
     if (vkAllocateCommandBuffers(ctx.device, &allocInfo, ctx.cmdBuffers.data()) != VK_SUCCESS) {
         ENGINE_LOG_CRITICAL("Failed to allocate command buffers");
     }
 }
 
-void createUniformBuffers(VulkanContext &ctx) {
+void createUniformBuffers(VulkanContext& ctx) {
     ENGINE_LOG_TRACE("Creating uniform buffer...");
     BufferDesc desc{};
     desc.size = 2048;
@@ -224,7 +242,7 @@ void createUniformBuffers(VulkanContext &ctx) {
     }
 }
 
-void createDescriptorSetLayout(VulkanContext &ctx) {
+void createDescriptorSetLayout(VulkanContext& ctx) {
     ENGINE_LOG_TRACE("Creating descriptor set layouts...");
 
     // Set 0 : Global Uniform
@@ -232,7 +250,7 @@ void createDescriptorSetLayout(VulkanContext &ctx) {
     globalLayoutBinding.binding = 0;
     globalLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     globalLayoutBinding.descriptorCount = 1;
-    globalLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    globalLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     globalLayoutBinding.pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutCreateInfo globalLayoutInfo{};
@@ -245,30 +263,61 @@ void createDescriptorSetLayout(VulkanContext &ctx) {
     }
 
     // Set 1 : Material / Texture
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 0;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    std::array<VkDescriptorSetLayoutBinding, 6> samplerLayoutBinding{};
+    // Material Data
+    samplerLayoutBinding[0].binding = 0;
+    samplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    samplerLayoutBinding[0].descriptorCount = 1;
+    samplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding[0].pImmutableSamplers = nullptr;
+    // Texture : Base Color
+    samplerLayoutBinding[1].binding = 1;
+    samplerLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding[1].descriptorCount = 1;
+    samplerLayoutBinding[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding[1].pImmutableSamplers = nullptr;
+    // Texture : Normal
+    samplerLayoutBinding[2].binding = 2;
+    samplerLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding[2].descriptorCount = 1;
+    samplerLayoutBinding[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding[2].pImmutableSamplers = nullptr;
+    // Texture : Metallic Roughness
+    samplerLayoutBinding[3].binding = 3;
+    samplerLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding[3].descriptorCount = 1;
+    samplerLayoutBinding[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding[3].pImmutableSamplers = nullptr;
+    // Texture : Occlusion
+    samplerLayoutBinding[4].binding = 4;
+    samplerLayoutBinding[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding[4].descriptorCount = 1;
+    samplerLayoutBinding[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding[4].pImmutableSamplers = nullptr;
+    // Texture : Emissive
+    samplerLayoutBinding[5].binding = 5;
+    samplerLayoutBinding[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding[5].descriptorCount = 1;
+    samplerLayoutBinding[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding[5].pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutCreateInfo textureLayoutInfo{};
     textureLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    textureLayoutInfo.bindingCount = 1;
-    textureLayoutInfo.pBindings = &samplerLayoutBinding;
+    textureLayoutInfo.bindingCount = 6;
+    textureLayoutInfo.pBindings = samplerLayoutBinding.data();
 
     if (vkCreateDescriptorSetLayout(ctx.device, &textureLayoutInfo, nullptr, &ctx.textureDescriptorSetLayout) != VK_SUCCESS) {
         ENGINE_LOG_CRITICAL("Failed to create texture descriptor set layout");
     }
 }
 
-void createDescriptorPool(VulkanContext &ctx) {
+void createDescriptorPool(VulkanContext& ctx) {
     ENGINE_LOG_TRACE("Creating descriptor pool...");
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(ctx.maxFramesInFlight);
+    poolSizes[0].descriptorCount = static_cast<uint32_t>(ctx.maxFramesInFlight + ctx.maxTextureCount);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(ctx.maxTextureCount);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(ctx.maxTextureCount * 6);
 
     VkDescriptorPoolCreateInfo descriptorPoolInfo{};
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -282,7 +331,7 @@ void createDescriptorPool(VulkanContext &ctx) {
     }
 }
 
-void createDescriptorSets(VulkanContext &ctx) {
+void createDescriptorSets(VulkanContext& ctx) {
     ENGINE_LOG_TRACE("Allocating descriptor sets...");
     std::vector<VkDescriptorSetLayout> layouts(ctx.maxFramesInFlight, ctx.globalDescriptorSetLayout);
 
@@ -316,17 +365,14 @@ void createDescriptorSets(VulkanContext &ctx) {
     }
 }
 
-void createPipelineLayout(VulkanContext &ctx) {
+void createPipelineLayout(VulkanContext& ctx) {
     ENGINE_LOG_TRACE("Creating pipeline layout...");
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(math::Mat4);
 
-    std::array<VkDescriptorSetLayout, 2> setLayouts = {
-        ctx.globalDescriptorSetLayout,
-        ctx.textureDescriptorSetLayout
-    };
+    std::array<VkDescriptorSetLayout, 2> setLayouts = {ctx.globalDescriptorSetLayout, ctx.textureDescriptorSetLayout};
 
     VkPipelineLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -342,8 +388,15 @@ void createPipelineLayout(VulkanContext &ctx) {
 
 /* ------------ Cleanup ------------ */
 
-void cleanupSwapchain(VulkanContext &ctx) {
+void cleanupSwapchain(VulkanContext& ctx) {
     vkDeviceWaitIdle(ctx.device);
+
+    for (auto sem : ctx.renderFinishedSemaphores) {
+        if (sem != VK_NULL_HANDLE) {
+            vkDestroySemaphore(ctx.device, sem, nullptr);
+        }
+    }
+    ctx.renderFinishedSemaphores.clear();
 
     for (auto view : ctx.swapchainImageViews) {
         vkDestroyImageView(ctx.device, view, nullptr);
@@ -430,9 +483,8 @@ void endSingleTimeCommands(const VulkanContext& ctx, VkCommandBuffer commandBuff
 }
 
 void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
-                           VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
-                           VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess,
-                           VkImageAspectFlags aspectMask) {
+                           VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess, VkPipelineStageFlags2 dstStage,
+                           VkAccessFlags2 dstAccess, VkImageAspectFlags aspectMask) {
     VkImageMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
     barrier.srcStageMask = srcStage;

@@ -16,7 +16,8 @@ namespace midgard::resource {
 class ModelImporter {
 public:
     static std::shared_ptr<scene::SceneNode> loadModel(const std::string& filePath, bifrost::Bifrost* bifrost,
-                                                       bifrost::PipelineManager& pipelineManager);
+                                                       bifrost::PipelineManager& pipelineManager,
+                                                       const std::string& shaderPath = "shaders/base.hlsl");
 };
 
 } // namespace midgard::resource

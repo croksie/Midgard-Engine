@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <assimp/GltfMaterial.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -22,6 +23,7 @@
 #include "utils/log.h"
 
 #include "bifrost/bifrost.h"
+#include "bifrost/bind_group.h"
 #include "bifrost/buffer.h"
 #include "bifrost/pipeline.h"
 #include "bifrost/pipeline_manager.h"
@@ -127,17 +129,19 @@ std::shared_ptr<Mesh> processMesh(const aiMesh* aiMesh, bifrost::Bifrost* bifros
     return std::make_shared<Mesh>(vertexBuffer, indexBuffer);
 }
 
-std::shared_ptr<bifrost::Texture> loadTextureFromAssimp(const aiMaterial* aiMat, const aiScene* scene, const std::string& directory,
-                                                        bifrost::Bifrost* bifrost,
+std::shared_ptr<bifrost::Texture> loadTextureFromAssimp(const aiMaterial* aiMat, const std::vector<aiTextureType>& typesToTry,
+                                                        const aiScene* scene, const std::string& directory, bifrost::Bifrost* bifrost,
+                                                        bifrost::TextureFormat format,
                                                         std::unordered_map<std::string, std::shared_ptr<bifrost::Texture>>& textureCache) {
 
     aiString texPath;
     bool foundTexture = false;
 
-    if (aiMat->GetTexture(aiTextureType_BASE_COLOR, 0, &texPath) == AI_SUCCESS) {
-        foundTexture = true;
-    } else if (aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS) {
-        foundTexture = true;
+    for (aiTextureType type : typesToTry) {
+        if (aiMat->GetTexture(type, 0, &texPath) == AI_SUCCESS) {
+            foundTexture = true;
+            break;
+        }
     }
 
     if (!foundTexture) {
@@ -169,7 +173,7 @@ std::shared_ptr<bifrost::Texture> loadTextureFromAssimp(const aiMaterial* aiMat,
                 bifrost::TextureDesc texDesc{};
                 texDesc.width = static_cast<uint32_t>(width);
                 texDesc.height = static_cast<uint32_t>(height);
-                texDesc.format = bifrost::TextureFormat::RGBA8_SRGB;
+                texDesc.format = format;
                 texDesc.initialData = pixels;
                 texDesc.size = static_cast<uint32_t>(width * height * 4);
 
@@ -193,14 +197,16 @@ std::shared_ptr<bifrost::Texture> loadTextureFromAssimp(const aiMaterial* aiMat,
             bifrost::TextureDesc texDesc{};
             texDesc.width = static_cast<uint32_t>(width);
             texDesc.height = static_cast<uint32_t>(height);
-            texDesc.format = bifrost::TextureFormat::RGBA8_SRGB;
+            texDesc.format = format;
             texDesc.initialData = rgbaBuffer.data();
             texDesc.size = static_cast<uint32_t>(rgbaBuffer.size());
 
             texture = bifrost->createTexture(texDesc);
         }
     } else {
-        std::filesystem::path fullPath = std::filesystem::path(directory) / texPath.C_Str();
+        std::string relPath = texPath.C_Str();
+        std::replace(relPath.begin(), relPath.end(), '\\', '/');
+        std::filesystem::path fullPath = std::filesystem::path(directory) / relPath;
         if (std::filesystem::exists(fullPath)) {
             int width = 0;
             int height = 0;
@@ -211,7 +217,7 @@ std::shared_ptr<bifrost::Texture> loadTextureFromAssimp(const aiMaterial* aiMat,
                 bifrost::TextureDesc texDesc{};
                 texDesc.width = static_cast<uint32_t>(width);
                 texDesc.height = static_cast<uint32_t>(height);
-                texDesc.format = bifrost::TextureFormat::RGBA8_SRGB;
+                texDesc.format = format;
                 texDesc.initialData = pixels;
                 texDesc.size = static_cast<uint32_t>(width * height * 4);
 
@@ -237,12 +243,125 @@ std::shared_ptr<Material> processMaterial(const aiMaterial* aiMat, const aiScene
                                           std::shared_ptr<bifrost::Pipeline> instancedPipe,
                                           std::unordered_map<std::string, std::shared_ptr<bifrost::Texture>>& textureCache) {
 
-    auto texture = loadTextureFromAssimp(aiMat, scene, directory, bifrost, textureCache);
-    if (!texture) {
-        texture = DefaultResources::getDefaultTexture();
+    // 1. Textures
+    auto baseColorTex = loadTextureFromAssimp(aiMat,
+                                              {aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE},
+                                              scene,
+                                              directory,
+                                              bifrost,
+                                              bifrost::TextureFormat::RGBA8_SRGB,
+                                              textureCache);
+
+    auto normalTex = loadTextureFromAssimp(aiMat,
+                                           {aiTextureType_NORMALS, aiTextureType_NORMAL_CAMERA, aiTextureType_HEIGHT},
+                                           scene,
+                                           directory,
+                                           bifrost,
+                                           bifrost::TextureFormat::RGBA8_UNORM,
+                                           textureCache);
+
+    auto mrTex = loadTextureFromAssimp(
+        aiMat,
+        {aiTextureType_GLTF_METALLIC_ROUGHNESS, aiTextureType_DIFFUSE_ROUGHNESS, aiTextureType_METALNESS, aiTextureType_UNKNOWN},
+        scene,
+        directory,
+        bifrost,
+        bifrost::TextureFormat::RGBA8_UNORM,
+        textureCache);
+
+    auto aoTex = loadTextureFromAssimp(aiMat,
+                                       {aiTextureType_AMBIENT_OCCLUSION, aiTextureType_LIGHTMAP},
+                                       scene,
+                                       directory,
+                                       bifrost,
+                                       bifrost::TextureFormat::RGBA8_UNORM,
+                                       textureCache);
+
+    auto emissiveTex = loadTextureFromAssimp(aiMat,
+                                             {aiTextureType_EMISSIVE, aiTextureType_EMISSION_COLOR},
+                                             scene,
+                                             directory,
+                                             bifrost,
+                                             bifrost::TextureFormat::RGBA8_SRGB,
+                                             textureCache);
+
+    // 2. Factors
+    MaterialData matData{};
+
+    aiColor4D baseColor(1.0f, 1.0f, 1.0f, 1.0f);
+    if (aiMat->Get(AI_MATKEY_BASE_COLOR, baseColor) == AI_SUCCESS) {
+        matData.baseColorFactor = math::Vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
+    } else if (aiMat->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == AI_SUCCESS) {
+        matData.baseColorFactor = math::Vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
     }
 
-    return std::make_shared<Material>(singlePipe, instancedPipe, texture);
+    float opacity = 1.0f;
+    if (aiMat->Get(AI_MATKEY_OPACITY, opacity) == AI_SUCCESS) {
+        matData.baseColorFactor.w *= opacity;
+    }
+
+    aiColor3D emissive(0.0f, 0.0f, 0.0f);
+    if (aiMat->Get(AI_MATKEY_COLOR_EMISSIVE, emissive) == AI_SUCCESS) {
+        matData.emissiveFactor = math::Vec3(emissive.r, emissive.g, emissive.b);
+    }
+
+    float metallic = 0.0f;
+    if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS) {
+        matData.metallicFactor = metallic;
+    }
+
+    float roughness = 1.0f;
+    if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS) {
+        matData.roughnessFactor = roughness;
+    }
+
+    aiString alphaMode;
+    if (aiMat->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode) == AI_SUCCESS) {
+        std::string modeStr(alphaMode.C_Str());
+        ENGINE_LOG_INFO("Material alphaMode: '{}'", modeStr);
+        if (modeStr == "OPAQUE") {
+            matData.alphaCutoff = 0.0f;
+        } else if (modeStr == "MASK") {
+            float alphaCutoff = 0.5f;
+            if (aiMat->Get(AI_MATKEY_GLTF_ALPHACUTOFF, alphaCutoff) == AI_SUCCESS) {
+                matData.alphaCutoff = alphaCutoff;
+            } else {
+                matData.alphaCutoff = 0.5f;
+            }
+        } else {
+            // BLEND mode: discard transparent border pixels so they don't block geometry
+            matData.alphaCutoff = 0.001f;
+        }
+    } else {
+        ENGINE_LOG_INFO("Material alphaMode not specified -> OPAQUE");
+        matData.alphaCutoff = 0.0f;
+    }
+
+    float occlusionStrength = 1.0f;
+    if (aiMat->Get(AI_MATKEY_GLTF_TEXTURE_STRENGTH(aiTextureType_AMBIENT_OCCLUSION, 0), occlusionStrength) == AI_SUCCESS ||
+        aiMat->Get(AI_MATKEY_GLTF_TEXTURE_STRENGTH(aiTextureType_LIGHTMAP, 0), occlusionStrength) == AI_SUCCESS) {
+        matData.occlusionStrength = occlusionStrength;
+    }
+
+    // 3. Create Uniform Buffer
+    bifrost::BufferDesc bufferDesc{};
+    bufferDesc.initData = &matData;
+    bufferDesc.size = sizeof(MaterialData);
+    bufferDesc.type = bifrost::BufferType::UNIFORM;
+    auto materialBuffer = bifrost->createBuffer(bufferDesc);
+
+    // 4. Create BindGroup
+    bifrost::BindGroupDesc bindGroupDesc{};
+    bindGroupDesc.entries.push_back({0, materialBuffer, nullptr});
+    bindGroupDesc.entries.push_back({1, nullptr, baseColorTex ? baseColorTex : DefaultResources::getDefaultTexture()});
+    bindGroupDesc.entries.push_back({2, nullptr, normalTex ? normalTex : DefaultResources::getDefaultNormalTexture()});
+    bindGroupDesc.entries.push_back({3, nullptr, mrTex ? mrTex : DefaultResources::getDefaultTexture()});
+    bindGroupDesc.entries.push_back({4, nullptr, aoTex ? aoTex : DefaultResources::getDefaultTexture()});
+    bindGroupDesc.entries.push_back({5, nullptr, emissiveTex ? emissiveTex : DefaultResources::getDefaultBlackTexture()});
+
+    auto bindGroup = bifrost->createBindGroup(bindGroupDesc);
+
+    return std::make_shared<Material>(singlePipe, instancedPipe, bindGroup);
 }
 
 std::shared_ptr<scene::SceneNode> processNode(const aiNode* node, const aiScene* scene,
@@ -270,33 +389,61 @@ std::shared_ptr<scene::SceneNode> processNode(const aiNode* node, const aiScene*
 } // namespace
 
 std::shared_ptr<scene::SceneNode> ModelImporter::loadModel(const std::string& filePath, bifrost::Bifrost* bifrost,
-                                                           bifrost::PipelineManager& pipelineManager) {
+                                                           bifrost::PipelineManager& pipelineManager, const std::string& shaderPath) {
 
     ENGINE_LOG_INFO("Loading model: {}", filePath);
 
-    // Read base shader
-    const std::string ASSET_FOLDER(ASSETS_PATH);
-    const std::string SHADER_CODE = utils::file::readTextFile(ASSET_FOLDER + "shaders/base.hlsl");
-    if (SHADER_CODE.empty()) {
-        ENGINE_LOG_ERROR("Failed to read base shader at {}shaders/base.hlsl", ASSET_FOLDER);
-        return nullptr;
+    std::string shaderKey = std::filesystem::path(shaderPath).stem().string();
+    std::string singleKey = shaderKey + "_single";
+    std::string instancedKey = shaderKey + "_instanced";
+
+    auto singlePipeline = pipelineManager.getPipeline(singleKey);
+    auto instancedPipeline = pipelineManager.getPipeline(instancedKey);
+
+    if (!singlePipeline || !instancedPipeline) {
+        // Read shader code with fallback to base.hlsl if specified shader is missing
+        const std::string ASSET_FOLDER(ASSETS_PATH);
+        std::string shaderCode = utils::file::readTextFile(ASSET_FOLDER + shaderPath);
+        std::string effectiveShader = shaderPath;
+
+        if (shaderCode.empty()) {
+            ENGINE_LOG_WARN("Failed to read shader at '{}{}', falling back to 'shaders/base.hlsl'...", ASSET_FOLDER, shaderPath);
+            shaderCode = utils::file::readTextFile(ASSET_FOLDER + "shaders/base.hlsl");
+            effectiveShader = "shaders/base.hlsl";
+            if (shaderCode.empty()) {
+                ENGINE_LOG_ERROR("Failed to read base shader at {}shaders/base.hlsl", ASSET_FOLDER);
+                return nullptr;
+            }
+        }
+
+        std::string effectiveKey = std::filesystem::path(effectiveShader).stem().string();
+        singleKey = effectiveKey + "_single";
+        instancedKey = effectiveKey + "_instanced";
+
+        singlePipeline = pipelineManager.getPipeline(singleKey);
+        instancedPipeline = pipelineManager.getPipeline(instancedKey);
+
+        if (!singlePipeline || !instancedPipeline) {
+            auto fsShared = bifrost->createShader(bifrost::ShaderType::FRAGMENT, shaderCode, false);
+
+            if (!singlePipeline) {
+                auto vsSingle = bifrost->createShader(bifrost::ShaderType::VERTEX, shaderCode, false);
+                bifrost::PipelineInfo singlePipeInfo{vsSingle, fsShared, false};
+                singlePipeline = pipelineManager.getOrCreatePipeline(bifrost, singleKey, singlePipeInfo);
+            }
+
+            if (!instancedPipeline) {
+                auto vsInstanced = bifrost->createShader(bifrost::ShaderType::VERTEX, shaderCode, true);
+                bifrost::PipelineInfo instancedPipeInfo{vsInstanced, fsShared, true};
+                instancedPipeline = pipelineManager.getOrCreatePipeline(bifrost, instancedKey, instancedPipeInfo);
+            }
+        }
     }
-
-    // Get or create pipelines via PipelineManager
-    auto vsSingle = bifrost->createShader(bifrost::ShaderType::VERTEX, SHADER_CODE, false);
-    auto vsInstanced = bifrost->createShader(bifrost::ShaderType::VERTEX, SHADER_CODE, true);
-    auto fsShared = bifrost->createShader(bifrost::ShaderType::FRAGMENT, SHADER_CODE, false);
-
-    bifrost::PipelineInfo singlePipeInfo{vsSingle, fsShared, false};
-    bifrost::PipelineInfo instancedPipeInfo{vsInstanced, fsShared, true};
-
-    auto singlePipeline = pipelineManager.getOrCreatePipeline(bifrost, "base_single", singlePipeInfo);
-    auto instancedPipeline = pipelineManager.getOrCreatePipeline(bifrost, "base_instanced", instancedPipeInfo);
 
     // Import scene with Assimp
     Assimp::Importer importer;
-    constexpr unsigned int importFlags = aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
-                                         aiProcess_SortByPType | aiProcess_GenSmoothNormals;
+    constexpr unsigned int importFlags =
+        aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_FlipUVs;
 
     const aiScene* scene = importer.ReadFile(filePath, importFlags);
 
@@ -320,7 +467,23 @@ std::shared_ptr<scene::SceneNode> ModelImporter::loadModel(const std::string& fi
     }
 
     // Fallback material if scene has no materials
-    auto fallbackMaterial = std::make_shared<Material>(singlePipeline, instancedPipeline, DefaultResources::getDefaultTexture());
+    MaterialData fallbackData{};
+    bifrost::BufferDesc fallbackBufferDesc{};
+    fallbackBufferDesc.initData = &fallbackData;
+    fallbackBufferDesc.size = sizeof(MaterialData);
+    fallbackBufferDesc.type = bifrost::BufferType::UNIFORM;
+    auto fallbackBuffer = bifrost->createBuffer(fallbackBufferDesc);
+
+    bifrost::BindGroupDesc fallbackBindGroupDesc{};
+    fallbackBindGroupDesc.entries.push_back({0, fallbackBuffer, nullptr});
+    fallbackBindGroupDesc.entries.push_back({1, nullptr, DefaultResources::getDefaultTexture()});
+    fallbackBindGroupDesc.entries.push_back({2, nullptr, DefaultResources::getDefaultNormalTexture()});
+    fallbackBindGroupDesc.entries.push_back({3, nullptr, DefaultResources::getDefaultTexture()});
+    fallbackBindGroupDesc.entries.push_back({4, nullptr, DefaultResources::getDefaultTexture()});
+    fallbackBindGroupDesc.entries.push_back({5, nullptr, DefaultResources::getDefaultBlackTexture()});
+    auto fallbackBindGroup = bifrost->createBindGroup(fallbackBindGroupDesc);
+
+    auto fallbackMaterial = std::make_shared<Material>(singlePipeline, instancedPipeline, fallbackBindGroup);
 
     // Process meshes and pair them with materials to create Model instances
     std::vector<std::shared_ptr<scene::Model>> loadedModels;
@@ -335,6 +498,12 @@ std::shared_ptr<scene::SceneNode> ModelImporter::loadModel(const std::string& fi
             material = loadedMaterials[aiMesh->mMaterialIndex];
         }
 
+        ENGINE_LOG_INFO("Mesh {} '{}': matIndex={}, numVertices={}, numFaces={}",
+                        meshIndex,
+                        aiMesh->mName.C_Str(),
+                        aiMesh->mMaterialIndex,
+                        aiMesh->mNumVertices,
+                        aiMesh->mNumFaces);
         loadedModels.push_back(std::make_shared<scene::Model>(mesh, material));
     }
 

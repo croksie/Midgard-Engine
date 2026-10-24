@@ -105,10 +105,4 @@ void OpenGLPipeline::bindIndexBuffer(std::shared_ptr<Buffer> indexBuffer) {
     m_numberOfIndicesInBindedObject = static_cast<GLsizei>(buffer->getSize() / sizeof(uint32_t));
 }
 
-void OpenGLPipeline::bindTexture(std::shared_ptr<Texture> texture, uint32_t slot) {
-    ENGINE_LOG_TRACE("Texture binding...");
-    OpenGLTexture* glTex = static_cast<OpenGLTexture*>(texture.get());
-    glBindTextureUnit(slot, glTex->getTextureID());
-}
-
 } // namespace midgard::bifrost::opengl

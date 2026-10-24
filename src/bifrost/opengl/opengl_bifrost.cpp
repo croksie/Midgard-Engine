@@ -6,6 +6,7 @@
 
 #include "utils/log.h"
 
+#include "bifrost/opengl/opengl_bind_group.h"
 #include "bifrost/opengl/opengl_buffer.h"
 #include "bifrost/opengl/opengl_pipeline.h"
 #include "bifrost/opengl/opengl_shader.h"
@@ -13,6 +14,7 @@
 
 #include "core/config.h"
 #include "platform/window/window.h"
+#include "resources/material.h"
 
 namespace midgard::bifrost::opengl {
 
@@ -25,7 +27,7 @@ void OpenGLBifrost::initialize(platform::Window* window, std::shared_ptr<core::E
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, m_config->resizable);
 // TODO : implement fullscreen mode
-#ifdef DEBUG
+#ifndef NDEBUG
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 
@@ -41,12 +43,11 @@ void OpenGLBifrost::initialize(platform::Window* window, std::shared_ptr<core::E
     ENGINE_LOG_INFO("OpenGL Version {}", (const char*)glGetString(GL_VERSION));
     ENGINE_LOG_INFO("GPU: {}", (const char*)glGetString(GL_RENDERER));
 
-#ifdef DEBUG
+#ifndef NDEBUG
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(
-        [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message,
-           const void* userParam) {
+        [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
             (void)source;
             (void)type;
             (void)id;
@@ -70,17 +71,30 @@ void OpenGLBifrost::initialize(platform::Window* window, std::shared_ptr<core::E
     glDepthFunc(GL_LESS);
     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 
-    // Backface-Culling
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
+    // Framebuffer sRGB conversion (to match vulkan)
+    glEnable(GL_FRAMEBUFFER_SRGB);
 
+    // Culling disabled for double-sided models
+    glDisable(GL_CULL_FACE); // TODO : Move this into the pipeline
+
+    // Uniform Buffer
     BufferDesc desc{};
     desc.size = 2048;
     desc.type = BufferType::UNIFORM;
     m_uniformBuffer = std::make_unique<OpenGLBuffer>(desc); // FIXME: Change the buffer size
 
+    BufferDesc matDesc{};
+    matDesc.size = sizeof(resource::MaterialData);
+    matDesc.type = BufferType::UNIFORM;
+    m_materialUniformBuffer = std::make_unique<OpenGLBuffer>(matDesc);
+
     ENGINE_LOG_INFO("Initialization success");
+}
+
+void OpenGLBifrost::shutdown() {
+    ENGINE_LOG_DEBUG("OpenGLBifrost shutting down...");
+    m_materialUniformBuffer.reset();
+    m_uniformBuffer.reset();
 }
 
 void OpenGLBifrost::onWindowResize(int width, int height) {
@@ -123,8 +137,7 @@ void OpenGLBifrost::bindVertexBuffer(std::shared_ptr<Pipeline> pipeline, std::sh
     ENGINE_LOG_TRACE("Vertex buffer bound");
 }
 
-void OpenGLBifrost::bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer,
-                                       uint32_t offset) {
+void OpenGLBifrost::bindInstanceBuffer(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Buffer> buffer, uint32_t offset) {
     if (pipeline == nullptr) {
         ENGINE_LOG_CRITICAL("Pipeline is null");
     }
@@ -179,15 +192,27 @@ std::shared_ptr<Texture> OpenGLBifrost::createTexture(const TextureDesc& desc) {
     return std::make_shared<OpenGLTexture>(desc);
 }
 
-void OpenGLBifrost::bindTexture(std::shared_ptr<Pipeline> pipeline, std::shared_ptr<Texture> texture, uint32_t slot) {
-    if (pipeline == nullptr) {
-        ENGINE_LOG_CRITICAL("Pipeline is null");
+std::shared_ptr<BindGroup> OpenGLBifrost::createBindGroup(const BindGroupDesc& desc) {
+    ENGINE_LOG_TRACE("Creating OpenGL bind group...");
+    return std::make_shared<OpenGLBindGroup>(desc);
+}
+
+void OpenGLBifrost::bindGroup(uint32_t setIndex, std::shared_ptr<BindGroup> bindGroup) {
+    if (!bindGroup) {
+        return;
     }
-    if (texture == nullptr) {
-        ENGINE_LOG_CRITICAL("Texture is null");
+    const auto& desc = std::static_pointer_cast<OpenGLBindGroup>(bindGroup)->getDesc();
+    for (const auto& entry : desc.entries) {
+        if (entry.buffer) {
+            auto glBuffer = std::static_pointer_cast<OpenGLBuffer>(entry.buffer);
+            uint32_t uboBinding = (setIndex == 1) ? (entry.binding + 1) : entry.binding;
+            glBindBufferBase(GL_UNIFORM_BUFFER, uboBinding, glBuffer->getBufferId());
+        }
+        if (entry.texture) {
+            auto glTexture = std::static_pointer_cast<OpenGLTexture>(entry.texture);
+            glBindTextureUnit(entry.binding, glTexture->getTextureID());
+        }
     }
-    pipeline->bindTexture(texture, slot);
-    ENGINE_LOG_TRACE("Texture bound");
 }
 
 void OpenGLBifrost::setGlobalUniform(const void* data, size_t size) {
@@ -201,12 +226,9 @@ void OpenGLBifrost::setLocalUniform(const void* data, size_t size) {
     glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
     if (currentProgram > 0) {
         GLint loc = glGetUniformLocation(currentProgram, "u_Local.model");
-        if (loc == -1) {
-            loc = 0;
+        if (loc != -1) {
+            glUniformMatrix4fv(loc, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(data));
         }
-        glUniformMatrix4fv(loc, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(data));
-    } else {
-        glUniformMatrix4fv(0, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(data));
     }
 }
 
