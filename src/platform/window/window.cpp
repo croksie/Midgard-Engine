@@ -24,11 +24,14 @@ void Window::initializeWindow(const int width, const int height, const char* tit
     }
     glfwSetWindowUserPointer(m_window, this);
 
-    glfwSetWindowSizeCallback(m_window, [](GLFWwindow* window, int width, int height) {
+    glfwSetFramebufferSizeCallback(m_window, [](GLFWwindow* window, int width, int height) {
         auto* instance = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-        
-        if (instance && instance->m_onSizeChanged) {
-            instance->m_onSizeChanged(width, height);
+        if (instance) {
+            for (const auto& cb : instance->m_sizeCallbacks) {
+                if (cb) {
+                    cb(width, height);
+                }
+            }
         }
     });
 
