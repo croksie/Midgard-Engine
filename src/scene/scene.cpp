@@ -25,7 +25,7 @@ renderer::RenderScene SceneGraph::generateRenderScene() {
             packet.material = model->getMaterial();
             packet.instanceTransforms = transforms;
 
-            rs.m_intancedDraws.emplace_back(std::move(packet));
+            rs.m_instancedDraws.emplace_back(std::move(packet));
         } else {
             for (auto& transform : transforms) {
                 render::SingleDrawPacket packet;
