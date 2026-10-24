@@ -41,7 +41,7 @@ VSOutput VSMain(VSInputStandard input) {
     pos = mul(pos, u_Global.view);
     pos = mul(pos, u_Global.projection);
     output.pos = pos;
-    output.normal = input.normal;
+    output.normal = normalize(mul(input.normal, (float3x3)u_Local.model));
     output.texCoord = input.texCoord;
     return output;
 }
@@ -63,7 +63,7 @@ VSOutput VSMainInstanced(VSInputInstanced input) {
     pos = mul(pos, u_Global.view);
     pos = mul(pos, u_Global.projection);
     output.pos = pos;
-    output.normal = input.normal;
+    output.normal = normalize(mul(input.normal, (float3x3)input.instanceModel));
     output.texCoord = input.texCoord;
     return output;
 }
@@ -75,26 +75,56 @@ struct PSInput {
     [[vk::location(1)]] float2 texCoord : TEXCOORD0;
 };
 
-[[vk::combinedImageSampler]]
+struct MaterialData {
+    float4 baseColorFactor;
+    float3 emissiveFactor;
+    float  roughnessFactor;
+    float  metallicFactor;
+    float  alphaCutoff;
+    float  occlusionStrength;
+    float  _padding;
+};
+
 [[vk::binding(0, 1)]]
-Texture2D u_Texture : register(t0, space1);
+ConstantBuffer<MaterialData> u_Material : register(b0, space1);
 
 [[vk::combinedImageSampler]]
-[[vk::binding(0, 1)]]
-SamplerState u_Sampler : register(s0, space1);
+[[vk::binding(1, 1)]]
+Texture2D u_Texture : register(t1, space1);
+
+[[vk::combinedImageSampler]]
+[[vk::binding(1, 1)]]
+SamplerState u_Sampler : register(s1, space1);
+
+[[vk::combinedImageSampler]]
+[[vk::binding(5, 1)]]
+Texture2D u_EmissiveTexture : register(t5, space1);
+
+[[vk::combinedImageSampler]]
+[[vk::binding(5, 1)]]
+SamplerState u_EmissiveSampler : register(s5, space1);
 
 float4 PSMain(PSInput input) : SV_Target {
 
     float4 texColor = u_Texture.Sample(u_Sampler, input.texCoord);
 
+    float4 albedo = texColor * u_Material.baseColorFactor;
+
+    if (albedo.a < u_Material.alphaCutoff) {
+        discard;
+    }
+
     float3 lightDir = normalize(float3(0.5f, 1.0f, -0.5f));
     float3 normal = normalize(input.normal);
 
-    float diffuse = max(dot(normal, lightDir), 0.0f);
-    float ambient = 0.2f;
-    float lighting = ambient + diffuse * 0.8f;
-    
-    return float4(texColor.rgb * lighting, texColor.a);
+    // Two-sided diffuse lighting
+    float diffuse = max(abs(dot(normal, lightDir)), 0.0f);
+    float ambient = 0.25f;
+    float lighting = ambient + diffuse * 0.75f;
+
+    float3 emissive = u_EmissiveTexture.Sample(u_EmissiveSampler, input.texCoord).rgb * u_Material.emissiveFactor;
+
+    return float4(albedo.rgb * lighting + emissive, albedo.a);
 }
 
 
