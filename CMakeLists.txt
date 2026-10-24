@@ -226,11 +226,16 @@ if(MIDGARD_ENABLE_CLANG_TIDY)
     endif()
 endif()
 
-# Copie automatique de compile_commands.json à la racine pour l'IDE / LSP
-if(EXISTS "${CMAKE_BINARY_DIR}/compile_commands.json")
-    configure_file(
-        "${CMAKE_BINARY_DIR}/compile_commands.json"
-        "${CMAKE_SOURCE_DIR}/compile_commands.json"
-        COPYONLY
+# Copie automatique de compile_commands.json a la racine pour l'IDE / LSP
+# ATTENTION : Ne JAMAIS utiliser configure_file() sur compile_commands.json.
+# configure_file() enregistre le fichier comme dependance d'entree de build.ninja,
+# ce qui provoque une boucle infinie de reconfiguration (manifest dirty after 100 tries).
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+    add_custom_target(copy_compile_commands ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_BINARY_DIR}/compile_commands.json"
+            "${CMAKE_SOURCE_DIR}/compile_commands.json"
+        COMMENT "[Midgard] Syncing compile_commands.json to workspace root..."
+        VERBATIM
     )
 endif()
