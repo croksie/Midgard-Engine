@@ -20,6 +20,8 @@ class Buffer;
 class Texture;
 } // namespace midgard::bifrost
 
+#include "bifrost/pipeline_manager.h"
+
 namespace midgard::scene {
 class SceneGraph;
 }
@@ -35,6 +37,8 @@ public:
     void render();
     void shutdown();
 
+    bifrost::PipelineManager& getPipelineManager() { return m_pipelineManager; }
+
 private:
     std::shared_ptr<core::EngineConfig> m_config;
     std::unique_ptr<bifrost::Bifrost> m_rhi;
@@ -42,8 +46,13 @@ private:
     std::shared_ptr<scene::SceneGraph> m_sceneGraph;
     scene::Camera m_camera;
 
-    std::shared_ptr<bifrost::Buffer> m_instanceBuffer;
-    static constexpr size_t MAX_INSTANCES = 10000;
+    bifrost::PipelineManager m_pipelineManager;
+    std::vector<std::shared_ptr<bifrost::Buffer>> m_instanceBuffers;
+    uint32_t m_currentFrame = 0;
+    static constexpr size_t MAX_INSTANCES = 50000;
+
+    uint32_t m_lastWidth = 0;
+    uint32_t m_lastHeight = 0;
 
     float m_lastFrameTime = 0.0f;
     double m_lastMouseX = 0.0;

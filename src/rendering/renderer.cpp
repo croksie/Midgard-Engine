@@ -9,7 +9,6 @@
 
 #include "math/math.h"
 #include "utils/file_utils.h"
-#include "utils/importer.h"
 #include "utils/log.h"
 
 #include "bifrost/buffer.h"
@@ -51,26 +50,38 @@ void Renderer::initialize(platform::Window* window, std::shared_ptr<core::Engine
     m_rhi->initialize(window, m_config);
 
     // Init instance buffer
-    bifrost::BufferDesc instanceBufDesc{};
-    instanceBufDesc.type = bifrost::BufferType::VERTEX;
-    instanceBufDesc.size = MAX_INSTANCES * sizeof(bifrost::InstanceData);
-    instanceBufDesc.initData = nullptr;
-    m_instanceBuffer = m_rhi->createBuffer(instanceBufDesc);
+    uint32_t framesInFlight = std::max(1u, m_config->maxFramesInFlight);
+    m_instanceBuffers.resize(framesInFlight);
+    for (uint32_t i = 0; i < framesInFlight; ++i) {
+        bifrost::BufferDesc instanceBufDesc{};
+        instanceBufDesc.type = bifrost::BufferType::VERTEX;
+        instanceBufDesc.size = MAX_INSTANCES * sizeof(bifrost::InstanceData);
+        instanceBufDesc.initData = nullptr;
+        m_instanceBuffers[i] = m_rhi->createBuffer(instanceBufDesc);
+    }
 
     // Init default Resources
     resource::DefaultResources::init(m_rhi.get());
 
     // Init Camera
     core::CameraConfig cameraConfig{};
+    cameraConfig.widthResolution = static_cast<float>(m_config->windowWidth);
+    cameraConfig.heightResolution = static_cast<float>(m_config->windowHeight);
     m_camera = scene::Camera(cameraConfig);
+    m_lastWidth = m_config->windowWidth;
+    m_lastHeight = m_config->windowHeight;
+
+    window->setWindowSizeCallback([this](int width, int height) {
+        if (width > 0 && height > 0) {
+            m_camera.updateProjection(static_cast<float>(width), static_cast<float>(height));
+        }
+    });
 
     // Init SceneGraph
     m_sceneGraph = std::make_shared<midgard::scene::SceneGraph>();
 
-    bifrost::PipelineManager pipelineManager;
-
     auto rootNode = std::make_unique<scene::SceneNode>();
-    auto modelNode = resource::ModelImporter::loadModel(assetFolder + "model/voiture.glb", m_rhi.get(), pipelineManager);
+    auto modelNode = resource::ModelImporter::loadModel(assetFolder + "model/suzanne.glb", m_rhi.get(), m_pipelineManager);
     if (modelNode) {
         rootNode->addChild(modelNode);
     }
@@ -84,6 +95,15 @@ void Renderer::render() {
     const float currentTime = static_cast<float>(glfwGetTime());
     const float deltaTime = (m_lastFrameTime > 0.0f) ? (currentTime - m_lastFrameTime) : 0.016f;
     m_lastFrameTime = currentTime;
+
+    // Window size change check
+    if (m_config->windowWidth != m_lastWidth || m_config->windowHeight != m_lastHeight) {
+        m_lastWidth = m_config->windowWidth;
+        m_lastHeight = m_config->windowHeight;
+        if (m_lastWidth > 0 && m_lastHeight > 0) {
+            m_camera.updateProjection(static_cast<float>(m_lastWidth), static_cast<float>(m_lastHeight));
+        }
+    }
 
     // Mouse Look
     double mouseX, mouseY;
@@ -112,7 +132,7 @@ void Renderer::render() {
     if (platform::Input::isKeyPressed(platform::KeyCode::Space))
         m_camera.processKeyboard(math::Vec3(0.0f, 1.0f, 0.0f), deltaTime);
 
-    // World martrix
+    // World matrix
     glm::mat4 matrices[2] = {m_camera.getViewMatrix(), m_camera.getProjectionMatrix()};
     const void* data = matrices;
 
@@ -130,34 +150,47 @@ void Renderer::render() {
         m_rhi->bindVertexBuffer(pipeline, packet.mesh->getVertexBuffer());
         m_rhi->bindIndexBuffer(pipeline, packet.mesh->getIndexBuffer());
         m_rhi->setLocalUniform(&packet.worldTransform, sizeof(math::Mat4));
-        m_rhi->bindTexture(pipeline, packet.material->getTexture(), 0);
+        m_rhi->bindGroup(1, packet.material->getBindGroup());
         m_rhi->draw(pipeline, 1);
     }
 
     // Render instanced models
+    auto& currentInstanceBuffer = m_instanceBuffers[m_currentFrame];
     size_t currentInstanceOffset = 0;
-    for (const auto& packet : renderScene.m_intancedDraws) {
-        size_t dataSize = packet.instanceTransforms.size() * sizeof(math::Mat4);
+    const size_t maxBufferSize = MAX_INSTANCES * sizeof(bifrost::InstanceData);
 
-        m_instanceBuffer->setData(dataSize, packet.instanceTransforms.data(), currentInstanceOffset);
+    for (const auto& packet : renderScene.m_instancedDraws) {
+        size_t dataSize = packet.instanceTransforms.size() * sizeof(math::Mat4);
+        if (currentInstanceOffset + dataSize > maxBufferSize) {
+            ENGINE_LOG_ERROR("Instance buffer overflow");
+            break;
+        }
+
+        currentInstanceBuffer->setData(dataSize, packet.instanceTransforms.data(), currentInstanceOffset);
 
         auto pipeline = packet.material->getPipeline(true);
         m_rhi->bindPipeline(pipeline.get());
         m_rhi->bindVertexBuffer(pipeline, packet.mesh->getVertexBuffer());
-        m_rhi->bindInstanceBuffer(pipeline, m_instanceBuffer, static_cast<uint32_t>(currentInstanceOffset));
+        m_rhi->bindInstanceBuffer(pipeline, currentInstanceBuffer, static_cast<uint32_t>(currentInstanceOffset));
         m_rhi->bindIndexBuffer(pipeline, packet.mesh->getIndexBuffer());
-        m_rhi->bindTexture(pipeline, packet.material->getTexture(), 0);
+        m_rhi->bindGroup(1, packet.material->getBindGroup());
         m_rhi->draw(pipeline, static_cast<uint32_t>(packet.instanceTransforms.size()));
+
+        currentInstanceOffset += dataSize;
     }
 
     m_rhi->endFrame();
+    m_currentFrame = (m_currentFrame + 1) % m_instanceBuffers.size();
     ENGINE_LOG_TRACE("Render end");
 }
 
 void Renderer::shutdown() {
     ENGINE_LOG_DEBUG("Renderer shutting down ...");
+    if (m_rhi) {
+        m_rhi->waitIdle();
+    }
     m_sceneGraph = nullptr;
-    m_instanceBuffer = nullptr;
+    m_instanceBuffers.clear();
     resource::DefaultResources::shutdown();
     m_rhi->shutdown(); // Ensure to have free all buffer and pipeline before
 }
