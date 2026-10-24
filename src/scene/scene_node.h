@@ -35,15 +35,21 @@ public:
 
     void addModel(std::shared_ptr<Model> model) { m_models.emplace_back(std::move(model)); }
 
-    void addChild(std::shared_ptr<SceneNode> child) { m_childrens.push_back(child); }
+    void addChild(std::shared_ptr<SceneNode> child) {
+        if (!child) return;
+        child->m_parent = this;
+        child->setDirty();
+        m_childrens.push_back(std::move(child));
+    }
+    SceneNode* getParent() const { return m_parent; }
     math::Mat4 getWorldMatrix() const { return m_cachedWorldMatrix; }
 
     void setDirty() {
-        if (m_isDirty)
-            return;
         m_isDirty = true;
         for (auto& child : m_childrens) {
-            child->setDirty();
+            if (child) {
+                child->setDirty();
+            }
         }
     }
     void collectTransforms(const math::Mat4& parentMatrix, std::unordered_map<Model*, std::vector<math::Mat4>>& groups) {
@@ -66,7 +72,7 @@ private:
     math::Mat4 m_cachedWorldMatrix = math::Mat4::identity();
     bool m_isDirty = true;
 
-    std::shared_ptr<SceneNode> m_parent;
+    SceneNode* m_parent = nullptr;
     std::vector<std::shared_ptr<SceneNode>> m_childrens;
     std::vector<std::shared_ptr<Model>> m_models;
 };
