@@ -79,7 +79,7 @@ struct Mat4 {
     }
 
     static Mat4 perspective(float fovRadians, float aspect, float zNear, float zFar) {
-        return Mat4(glm::perspective(fovRadians, aspect, zNear, zFar));
+        return Mat4(glm::perspectiveRH_ZO(fovRadians, aspect, zNear, zFar));
     }
 
     static Mat4 lookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {

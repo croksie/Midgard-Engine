@@ -11,6 +11,7 @@ public:
 
     glm::mat4 getProjectionMatrix() const { return m_projection; }
     glm::mat4 getViewMatrix() const;
+    void updateProjection(float width, float height);
 
     void processMouseMovement(float xOffset, float yOffset, bool constrainPitch = true);
     void processKeyboard(const math::Vec3& direction, float deltaTime);

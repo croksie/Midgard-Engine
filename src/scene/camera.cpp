@@ -10,8 +10,16 @@
 namespace midgard::scene {
 
 Camera::Camera(const core::CameraConfig& config, math::Vec3 position) : m_config(config), m_position(position) {
-    m_projection = glm::perspective(glm::radians(config.fov), config.widthResolution / config.heightResolution, 0.1f, 100.0f);
+    m_projection = glm::perspectiveRH_ZO(glm::radians(config.fov), config.widthResolution / config.heightResolution, 0.1f, 100.0f);
     updateCameraVectors();
+}
+
+void Camera::updateProjection(float width, float height) {
+    m_config.widthResolution = width;
+    m_config.heightResolution = height;
+    if (height > 0.0f) {
+        m_projection = glm::perspectiveRH_ZO(glm::radians(m_config.fov), width / height, 0.1f, 100.0f);
+    }
 }
 
 glm::mat4 Camera::getViewMatrix() const {
